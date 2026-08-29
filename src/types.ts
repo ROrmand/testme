@@ -53,6 +53,8 @@ export const DOMAIN_CATEGORY_KEYS: CategoryKey[] = [
   "dataEngineering",
 ];
 
+export type GradingMode = "semantic" | "keywords";
+
 export interface Rubric {
   requiredTerms: string[];
   minLength: number;
@@ -98,13 +100,48 @@ export interface VerifyResult {
   passed: boolean;
   score: number;
   total: number;
+  grading: GradingMode;
+  passThreshold?: number;
+  questionScores?: Array<{
+    id: string;
+    prompt: string;
+    accuracy: number;
+    alignment: "low" | "medium" | "high";
+    passed: boolean;
+    userSummary: string;
+    feedback: string;
+  }>;
   failures: Array<{
     id: string;
     prompt: string;
-    missingTerms: string[];
-    tooShort: boolean;
+    missingTerms?: string[];
+    tooShort?: boolean;
     missingSymbol?: string;
+    feedback?: string;
+    alignment?: string;
+    userSummary?: string;
+    accuracy?: number;
   }>;
+}
+
+export interface QuestionJudgment {
+  passed: boolean;
+  accuracy: number;
+  userSummary: string;
+  alignment: "low" | "medium" | "high";
+  feedback: string;
+}
+
+export interface JudgmentsFile {
+  diffHash: string;
+  gradedAt: string;
+  judgments: Record<string, QuestionJudgment>;
+}
+
+export interface ReferencesFile {
+  diffHash: string;
+  generatedAt: string;
+  references: Record<string, string>;
 }
 
 export interface PromptsSection {
@@ -124,6 +161,8 @@ export interface TestmeConfig {
   categories: Record<CategoryKey, boolean>;
   autoDetect: boolean;
   domain: string | null;
+  grading: GradingMode;
+  passThreshold: number;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 
@@ -132,6 +171,8 @@ export interface TestmeConfigInput {
   categories?: CategoryFlags;
   autoDetect?: boolean;
   domain?: string | null;
+  grading?: GradingMode;
+  passThreshold?: number;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 

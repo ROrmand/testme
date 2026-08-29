@@ -1,7 +1,23 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { loadConfig } from "./config.js";
 import { analyzeDiff } from "./diff.js";
-import { ANSWERS_PATH, PASS_PATH, SESSION_PATH, TESTME_DIR } from "./paths.js";
-import type { PassFile, Question, Session, VerifyResult } from "./types.js";
+import {
+  ANSWERS_PATH,
+  JUDGMENTS_PATH,
+  PASS_PATH,
+  REFERENCES_PATH,
+  SESSION_PATH,
+  TESTME_DIR,
+} from "./paths.js";
+import type {
+  GradingMode,
+  JudgmentsFile,
+  PassFile,
+  Question,
+  ReferencesFile,
+  Session,
+  VerifyResult,
+} from "./types.js";
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -38,7 +54,7 @@ export function scoreAnswer(answer: string, question: Question): {
   return { passed, missingTerms, tooShort, missingSymbol };
 }
 
-export function verifyAnswers(
+export function verifyAnswersKeywords(
   session: Session,
   answers: Record<string, string>,
 ): VerifyResult {
@@ -70,6 +86,112 @@ export function verifyAnswers(
     passed,
     score: total === 0 ? 0 : Math.round((passedCount / total) * 100),
     total,
+    grading: "keywords",
+    failures,
+  };
+}
+
+const ALIGNMENT_SCORE: Record<string, number> = {
+  high: 100,
+  medium: 75,
+  low: 0,
+};
+
+function clampAccuracy(value: number): number {
+  if (Number.isNaN(value)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+export function normalizeJudgment(judgment: {
+  passed: boolean;
+  accuracy?: number;
+  alignment: "low" | "medium" | "high";
+}): number {
+  if (judgment.accuracy !== undefined) {
+    return clampAccuracy(judgment.accuracy);
+  }
+
+  return ALIGNMENT_SCORE[judgment.alignment] ?? 0;
+}
+
+export function isQuestionPassing(
+  judgment: {
+    passed: boolean;
+    accuracy?: number;
+    alignment: "low" | "medium" | "high";
+  },
+  passThreshold: number,
+): boolean {
+  const accuracy = normalizeJudgment(judgment);
+  return (
+    judgment.passed &&
+    accuracy >= passThreshold &&
+    (judgment.alignment === "high" || judgment.alignment === "medium")
+  );
+}
+
+export function verifyAnswersSemantic(
+  session: Session,
+  judgments: JudgmentsFile,
+  passThreshold = 70,
+): VerifyResult {
+  const failures: VerifyResult["failures"] = [];
+  const questionScores: NonNullable<VerifyResult["questionScores"]> = [];
+  let accuracySum = 0;
+
+  for (const question of session.questions) {
+    const judgment = judgments.judgments[question.id];
+
+    if (!judgment) {
+      failures.push({
+        id: question.id,
+        prompt: question.prompt,
+        feedback: "No semantic judgment recorded for this question.",
+      });
+      continue;
+    }
+
+    const accuracy = normalizeJudgment(judgment);
+    const passed = isQuestionPassing(judgment, passThreshold);
+
+    questionScores.push({
+      id: question.id,
+      prompt: question.prompt,
+      accuracy,
+      alignment: judgment.alignment,
+      passed,
+      userSummary: judgment.userSummary,
+      feedback: judgment.feedback,
+    });
+
+    accuracySum += accuracy;
+
+    if (passed) {
+      continue;
+    }
+
+    failures.push({
+      id: question.id,
+      prompt: question.prompt,
+      feedback: judgment.feedback,
+      alignment: judgment.alignment,
+      userSummary: judgment.userSummary,
+      accuracy,
+    });
+  }
+
+  const total = session.questions.length;
+  const passed = failures.length === 0 && total > 0;
+
+  return {
+    passed,
+    score: total === 0 ? 0 : Math.round(accuracySum / total),
+    total,
+    grading: "semantic",
+    passThreshold,
+    questionScores,
     failures,
   };
 }
@@ -84,15 +206,44 @@ export function loadSession(): Session {
 
 export function loadAnswers(): Record<string, string> {
   if (!existsSync(ANSWERS_PATH)) {
-    throw new Error("No answers found. Write answers to .testme/answers.json first.");
+    throw new Error("No answers found. Collect answers in chat first.");
   }
 
   return JSON.parse(readFileSync(ANSWERS_PATH, "utf8")) as Record<string, string>;
 }
 
+export function loadReferences(): ReferencesFile | null {
+  if (!existsSync(REFERENCES_PATH)) {
+    return null;
+  }
+
+  return JSON.parse(readFileSync(REFERENCES_PATH, "utf8")) as ReferencesFile;
+}
+
+export function loadJudgments(): JudgmentsFile {
+  if (!existsSync(JUDGMENTS_PATH)) {
+    throw new Error(
+      "No judgments found. The agent must grade answers semantically and write .testme/judgments.json before verify.",
+    );
+  }
+
+  return JSON.parse(readFileSync(JUDGMENTS_PATH, "utf8")) as JudgmentsFile;
+}
+
+export function writeJudgments(judgments: JudgmentsFile): void {
+  mkdirSync(TESTME_DIR, { recursive: true });
+  writeFileSync(JUDGMENTS_PATH, `${JSON.stringify(judgments, null, 2)}\n`, "utf8");
+}
+
+export function writeReferences(references: ReferencesFile): void {
+  mkdirSync(TESTME_DIR, { recursive: true });
+  writeFileSync(REFERENCES_PATH, `${JSON.stringify(references, null, 2)}\n`, "utf8");
+}
+
 export function verifySession(cwd: string, branch = "main"): VerifyResult {
   const session = loadSession();
   const answers = loadAnswers();
+  const config = loadConfig(cwd);
   const current = analyzeDiff(cwd, branch);
 
   if (session.diffHash !== current.diffHash) {
@@ -101,7 +252,26 @@ export function verifySession(cwd: string, branch = "main"): VerifyResult {
     );
   }
 
-  const result = verifyAnswers(session, answers);
+  const answerIds = new Set(Object.keys(answers));
+  for (const question of session.questions) {
+    if (!answerIds.has(question.id) || !answers[question.id]?.trim()) {
+      throw new Error(`Missing answer for ${question.id}.`);
+    }
+  }
+
+  let result: VerifyResult;
+
+  if (config.grading === "keywords") {
+    result = verifyAnswersKeywords(session, answers);
+  } else {
+    const judgments = loadJudgments();
+    if (judgments.diffHash !== session.diffHash) {
+      throw new Error(
+        "Judgments are stale. Re-grade answers against the current session.",
+      );
+    }
+    result = verifyAnswersSemantic(session, judgments, config.passThreshold);
+  }
 
   if (result.passed) {
     const pass: PassFile = {
@@ -134,4 +304,12 @@ export function isPassValid(cwd: string, branch = "main"): boolean {
 
   const current = analyzeDiff(cwd, branch);
   return pass.diffHash === current.diffHash;
+}
+
+// Backwards-compatible export used in tests
+export function verifyAnswers(
+  session: Session,
+  answers: Record<string, string>,
+): VerifyResult {
+  return verifyAnswersKeywords(session, answers);
 }

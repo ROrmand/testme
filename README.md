@@ -21,8 +21,9 @@ This installs into your repo:
 flowchart TD
     work[Make changes] --> prompts[Update PROMPTS.md]
     prompts --> gen[npx testme generate]
-    gen --> answer[Write .testme/answers.json]
-    answer --> verify[npx testme verify]
+    gen --> answer[Answer questions in chat]
+    answer --> write[Agent writes .testme/answers.json]
+    write --> verify[npx testme verify]
     verify -->|PASS| push[git push origin main]
     verify -->|FAIL| fix[Fix answers or PROMPTS.md]
     push --> reset[PROMPTS.md resets via hook]
@@ -47,23 +48,21 @@ npx testme generate
 
 Reads `SUMMARY.md`, `PROMPTS.md`, and git diff only. Produces 3–5 targeted questions in `.testme/session.json`.
 
-### 3. Answer questions
+### 3. Answer questions (in chat)
 
-Read only the files listed in each question's `files[]` array. Write `.testme/answers.json`:
+Run `/testme` in Cursor. The agent asks each question one at a time in chat — reply in plain messages. The agent writes `.testme/answers.json` from your replies before verifying.
 
-```json
-{
-  "q1": "In src/auth.ts I added validateToken middleware to check JWT expiry before handlers run."
-}
-```
+For each question, read only the files listed in that question's `files[]` array if you need to check your answer.
 
-### 4. Verify
+### 4. Verify (semantic grading)
+
+The agent generates reference answers, asks you questions in chat, then grades your replies with an **accuracy score (0–100)** and **alignment** (`low` / `medium` / `high`) per question. Default pass threshold is **70%** accuracy (`passThreshold` in config).
 
 ```bash
 npx testme verify
 ```
 
-Deterministic keyword matching — no extra LLM calls. On pass, `.testme/pass.json` is written.
+On pass, `.testme/pass.json` is written.
 
 ### 5. Push
 
@@ -172,8 +171,8 @@ Add to `SUMMARY.md`:
 
 - No full-repo scans — only git diff metadata + two md files
 - Configurable question count and categories via `testme.config.json`
+- Semantic grading by default (agent compares your answers to reference answers)
 - Targeted file reads via `files[]` pointers in session
-- Zero LLM calls for verification
 
 ## Troubleshooting
 
@@ -196,4 +195,4 @@ npm test
 
 - Symbol extraction uses regex (TS/JS/Python/Go patterns) — not a full AST parser
 - Protected branch defaults to `main` (`--branch` flag to override)
-- Verification is keyword-based — write substantive answers with the required terms
+- Verification is semantic by default (`grading: "semantic"`); legacy keyword mode available

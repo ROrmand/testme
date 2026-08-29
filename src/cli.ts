@@ -115,15 +115,41 @@ program
     const branch = cmd.parent?.opts().branch ?? "main";
     const result = verifySession(process.cwd(), branch);
 
+    if (result.questionScores && result.questionScores.length > 0) {
+      console.log("Scores:");
+      for (const item of result.questionScores) {
+        const status = item.passed ? "pass" : "fail";
+        console.log(
+          `  ${item.id}: ${item.accuracy}% accuracy · ${item.alignment} alignment · ${status}`,
+        );
+        console.log(`    summary: ${item.userSummary}`);
+      }
+      if (result.passThreshold !== undefined) {
+        console.log(`Pass threshold: ${result.passThreshold}% accuracy`);
+      }
+    }
+
     if (result.passed) {
-      console.log(`PASS (${result.score}%) — push to ${branch} is allowed.`);
+      console.log(`PASS (${result.score}% overall accuracy) — push to ${branch} is allowed.`);
       process.exit(0);
     }
 
-    console.error(`FAIL (${result.score}%) — fix answers and re-run verify.`);
+    console.error(`FAIL (${result.score}% overall accuracy) — fix answers and re-run verify.`);
     for (const failure of result.failures) {
       console.error(`  ${failure.id}: ${failure.prompt}`);
-      if (failure.missingTerms.length > 0) {
+      if (failure.accuracy !== undefined) {
+        console.error(`    accuracy: ${failure.accuracy}%`);
+      }
+      if (failure.feedback) {
+        console.error(`    feedback: ${failure.feedback}`);
+      }
+      if (failure.alignment) {
+        console.error(`    alignment: ${failure.alignment}`);
+      }
+      if (failure.userSummary) {
+        console.error(`    summary: ${failure.userSummary}`);
+      }
+      if (failure.missingTerms && failure.missingTerms.length > 0) {
         console.error(`    missing terms: ${failure.missingTerms.join(", ")}`);
       }
       if (failure.tooShort) {

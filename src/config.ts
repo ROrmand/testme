@@ -34,6 +34,8 @@ export const DEFAULT_CONFIG: TestmeConfig = {
   },
   autoDetect: true,
   domain: null,
+  grading: "semantic",
+  passThreshold: 70,
 };
 
 function readJsonFile(filePath: string): TestmeConfigInput | null {
@@ -75,6 +77,8 @@ export function mergeConfig(
     categories: mergeCategories(base.categories, patch.categories),
     autoDetect: patch.autoDetect ?? base.autoDetect,
     domain: patch.domain !== undefined ? patch.domain : base.domain,
+    grading: patch.grading ?? base.grading,
+    passThreshold: patch.passThreshold ?? base.passThreshold,
     _detected: patch._detected ?? base._detected,
   };
 }
@@ -86,6 +90,7 @@ export function normalizeConfig(config: TestmeConfig): TestmeConfig {
   return {
     ...config,
     questions: { min, max },
+    passThreshold: Math.min(100, Math.max(0, config.passThreshold ?? 70)),
     categories: mergeCategories(DEFAULT_CONFIG.categories, config.categories),
   };
 }

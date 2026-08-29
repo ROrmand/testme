@@ -22,5 +22,7 @@
     "dataEngineering": false
   },
   "autoDetect": true,
-  "domain": null
+  "domain": null,
+  "grading": "semantic",
+  "passThreshold": 70
 }
