@@ -163,6 +163,8 @@ export interface TestmeConfig {
   domain: string | null;
   grading: GradingMode;
   passThreshold: number;
+  protectedBranches: string[];
+  gateCommits: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 
@@ -173,6 +175,8 @@ export interface TestmeConfigInput {
   domain?: string | null;
   grading?: GradingMode;
   passThreshold?: number;
+  protectedBranches?: string[];
+  gateCommits?: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 

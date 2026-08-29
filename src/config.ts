@@ -36,6 +36,8 @@ export const DEFAULT_CONFIG: TestmeConfig = {
   domain: null,
   grading: "semantic",
   passThreshold: 70,
+  protectedBranches: ["main"],
+  gateCommits: false,
 };
 
 function readJsonFile(filePath: string): TestmeConfigInput | null {
@@ -79,6 +81,8 @@ export function mergeConfig(
     domain: patch.domain !== undefined ? patch.domain : base.domain,
     grading: patch.grading ?? base.grading,
     passThreshold: patch.passThreshold ?? base.passThreshold,
+    protectedBranches: patch.protectedBranches ?? base.protectedBranches,
+    gateCommits: patch.gateCommits ?? base.gateCommits,
     _detected: patch._detected ?? base._detected,
   };
 }

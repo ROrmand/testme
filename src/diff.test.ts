@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { hashDiff, parseDiff, extractTerms } from "./diff.js";
 import { parsePrompts, termsForFile } from "./prompts.js";
 import { scoreAnswer, verifyAnswers } from "./verify.js";
-import { isPushToMain, beforePushHook } from "./hooks.js";
 import type { Question } from "./types.js";
 
 const SAMPLE_DIFF = `diff --git a/src/auth.ts b/src/auth.ts
@@ -113,20 +112,5 @@ describe("verifyAnswers", () => {
     const result = scoreAnswer("Added middleware.", question);
     expect(result.passed).toBe(false);
     expect(result.missingTerms).toContain("validateToken");
-  });
-});
-
-describe("isPushToMain", () => {
-  it("detects main push commands", () => {
-    expect(isPushToMain("git push origin main")).toBe(true);
-    expect(isPushToMain("git push origin feature")).toBe(false);
-    expect(isPushToMain("git status")).toBe(false);
-  });
-});
-
-describe("beforePushHook", () => {
-  it("allows non-main pushes", () => {
-    const result = beforePushHook("/tmp", "git push origin feature");
-    expect(result.permission).toBe("allow");
   });
 });

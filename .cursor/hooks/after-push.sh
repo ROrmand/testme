@@ -13,9 +13,5 @@ if ! echo "$command" | grep -qE '^git[[:space:]]+push'; then
   exit 0
 fi
 
-if ! echo "$command" | grep -qE '(HEAD:main|origin[[:space:]]+main|\bmain\b|refs/heads/main)'; then
-  exit 0
-fi
-
-npx --yes testme hook after-push 2>/dev/null || true
+npx --yes testme hook after-push --command "$command" 2>/dev/null || true
 exit 0

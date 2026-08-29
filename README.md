@@ -1,6 +1,6 @@
 # testme
 
-Comprehension gate for desktop coding agents. **testme** blocks `git push` to `main` until you pass a deterministic test describing what changed — no LLM judge, minimal token use.
+Comprehension gate for desktop coding agents. **testme** blocks `git commit` (when enabled) and `git push` to protected branches until you pass a comprehension test describing what changed.
 
 ## Quick start
 
@@ -12,7 +12,7 @@ This installs into your repo:
 
 - `SUMMARY.md` — stable project map (stack, architecture, conventions)
 - `PROMPTS.md` — session change log (resets after successful push to `main`)
-- `.cursor/hooks.json` — blocks push until verified
+- `.cursor/hooks.json` — blocks commit/push until verified
 - `.cursor/skills/testme/SKILL.md` — `/testme` workflow for agents
 
 ## Workflow
@@ -88,6 +88,22 @@ After a successful push, `PROMPTS.md` resets automatically.
 | `testme reset` | Clear `.testme/` session state |
 
 ## Customization
+
+### Protected branches and commit gating
+
+Configure in `testme.config.json`:
+
+```json
+{
+  "protectedBranches": ["main"],
+  "gateCommits": true
+}
+```
+
+- `protectedBranches` — pushes to these branches require a valid `/testme` pass
+- `gateCommits` — when `true`, `git commit` is blocked until `/testme` passes
+
+Blocked push message: `You must run the /testme skill before pushing to 'main'.`
 
 ### Question count
 
@@ -179,6 +195,7 @@ Add to `SUMMARY.md`:
 | Issue | Fix |
 |-------|-----|
 | Push blocked | Run `/testme` or `npx testme generate` → answer → `verify` |
+| Commit blocked | `gateCommits` is on — run `/testme` before committing |
 | Session stale | Re-run `generate` after new edits |
 | Missing terms | Add clearer bullets to `PROMPTS.md` |
 | Pass invalid | `npx testme status` — diff changed since verify |
@@ -194,5 +211,6 @@ npm test
 ## Limitations (v1)
 
 - Symbol extraction uses regex (TS/JS/Python/Go patterns) — not a full AST parser
-- Protected branch defaults to `main` (`--branch` flag to override)
+- Protected branches configurable via `protectedBranches` in `testme.config.json` (`--branch` flag to override)
+- Optional commit gating via `gateCommits: true` in `testme.config.json`
 - Verification is semantic by default (`grading: "semantic"`); legacy keyword mode available

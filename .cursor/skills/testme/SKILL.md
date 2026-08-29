@@ -1,18 +1,18 @@
 ---
 name: testme
-description: Generate and verify codebase comprehension tests before pushing to main. Use when the user runs /testme, asks to push to main, or before git push.
+description: Generate and verify codebase comprehension tests before committing or pushing. Use when the user runs /testme, asks to commit or push, or when a hook blocks git commit/push.
 disable-model-invocation: true
 ---
 
 # testme
 
-Gate `git push` to `main` behind a comprehension check. The agent generates reference answers, quizzes you in chat, then grades your replies by **conceptual alignment** — not keyword matching.
+Gate `git commit` (when `gateCommits` is enabled) and `git push` to protected branches behind a comprehension check. The agent generates reference answers, quizzes you in chat, then grades your replies by **conceptual alignment** — not keyword matching.
 
 ## When to use
 
 - User runs `/testme`
-- User asks to push to `main`
-- Hook blocks a push and asks for verification
+- User asks to commit or push to a protected branch
+- Hook blocks a commit or push and asks for verification
 
 ## Workflow
 
@@ -25,7 +25,7 @@ Task Progress:
 - [ ] Step 3: Read referenced files; write .testme/references.json
 - [ ] Step 4: Ask each question in chat; collect answers from user replies
 - [ ] Step 5: Grade semantically; write .testme/judgments.json; run npx testme verify
-- [ ] Step 6: Push to main only after PASS
+- [ ] Step 6: Commit and push only after PASS
 ```
 
 ### Step 1: Update PROMPTS.md
@@ -129,17 +129,32 @@ Then run:
 npx testme verify
 ```
 
-**On PASS:** push to `main` is allowed.
+**On PASS:** commit and push to protected branches are allowed.
 
 **On FAIL:** re-ask only failed questions in chat, update answers + judgments, run `verify` again. Do not re-run `generate`.
 
-### Step 6: Push
+### Step 6: Commit and push
 
 Only after verify passes:
 
 ```bash
-git push origin main
+git commit -m "your message"
+git push origin <protected-branch>
 ```
+
+## Gate configuration
+
+In `testme.config.json`:
+
+```json
+{
+  "protectedBranches": ["main"],
+  "gateCommits": true
+}
+```
+
+- `gateCommits: true` blocks `git commit` until `/testme` passes
+- Pushes to any branch in `protectedBranches` are blocked with: `You must run the /testme skill before pushing to '<branch>'.`
 
 ## Token efficiency rules
 
@@ -225,7 +240,9 @@ Ask the user which categories matter if unclear, then update `testme.config.json
 |-------|-----|
 | Session stale | Re-run `npx testme generate` |
 | Missing terms | Add clearer bullets to `PROMPTS.md` |
-| Pass invalid | `npx testme status` — verify then push |
+| Commit blocked | `gateCommits` is on — run `/testme` before committing |
+| Push blocked | Run `/testme` or `npx testme generate` → answer → `verify` |
+| Pass invalid | `npx testme status` — verify then commit/push |
 | Reset session | `npx testme reset` |
 | Verify failed | Re-ask failed questions; re-grade and update judgments.json |
 | Missing judgments | Agent must grade semantically before running verify |

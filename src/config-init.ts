@@ -11,6 +11,7 @@ export function createInitialConfig(cwd: string): TestmeConfig {
   let config = mergeConfig(DEFAULT_CONFIG, null);
   const detection = detectProject(cwd, analysis);
   config = applyDetectionToConfig(config, detection);
+  config.gateCommits = true;
   return normalizeConfig(config);
 }
 

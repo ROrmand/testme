@@ -6,8 +6,8 @@ import { detectProject } from "./detect.js";
 import { analyzeDiff } from "./diff.js";
 import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.js";
 import { resolveConfig } from "./generate.js";
-import { beforePushHook } from "./hooks.js";
-import { initProject, resetPromptsAfterPush, resetTestmeState } from "./init.js";
+import { afterPushHook, beforeCommitHook, beforePushHook } from "./hooks.js";
+import { initProject, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
 
@@ -204,12 +204,33 @@ program
 const hook = program.command("hook").description("Cursor hook helpers");
 
 hook
+  .command("before-commit")
+  .description("Check whether a git commit should be allowed")
+  .requiredOption("-c, --command <cmd>", "shell command to evaluate")
+  .option("--json", "output hook JSON response")
+  .action((options) => {
+    const result = beforeCommitHook(process.cwd(), options.command);
+
+    if (options.json) {
+      console.log(JSON.stringify(result));
+      process.exit(result.permission === "allow" ? 0 : 2);
+    }
+
+    if (result.permission === "allow") {
+      process.exit(0);
+    }
+
+    console.error(result.agent_message ?? "Commit blocked by testme.");
+    process.exit(2);
+  });
+
+hook
   .command("before-push")
-  .description("Check whether a git push to main should be allowed")
+  .description("Check whether a git push to a protected branch should be allowed")
   .requiredOption("-c, --command <cmd>", "shell command to evaluate")
   .option("--json", "output hook JSON response")
   .action((options, cmd) => {
-    const branch = cmd.parent?.parent?.opts().branch ?? "main";
+    const branch = cmd.parent?.parent?.opts().branch ?? undefined;
     const result = beforePushHook(process.cwd(), options.command, branch);
 
     if (options.json) {
@@ -227,9 +248,15 @@ hook
 
 hook
   .command("after-push")
-  .description("Reset PROMPTS.md and session state after successful push to main")
-  .action(() => {
-    resetPromptsAfterPush(process.cwd());
+  .description("Reset PROMPTS.md and session state after successful push to a protected branch")
+  .option("-c, --command <cmd>", "shell command that was executed")
+  .action((options, cmd) => {
+    const branch = cmd.parent?.parent?.opts().branch ?? undefined;
+    if (options.command) {
+      afterPushHook(process.cwd(), options.command, branch);
+    } else {
+      afterPushHook(process.cwd(), "git push origin main", branch);
+    }
     process.exit(0);
   });
 

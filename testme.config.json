@@ -27,5 +27,7 @@
   "autoDetect": true,
   "domain": null,
   "grading": "semantic",
-  "passThreshold": 70
+  "passThreshold": 70,
+  "protectedBranches": ["main"],
+  "gateCommits": true
 }

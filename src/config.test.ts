@@ -27,6 +27,16 @@ describe("mergeConfig", () => {
     expect(config.questions.min).toBe(8);
     expect(config.questions.max).toBe(8);
   });
+
+  it("merges gate and branch settings", () => {
+    const merged = mergeConfig(DEFAULT_CONFIG, {
+      protectedBranches: ["main", "release"],
+      gateCommits: true,
+    });
+
+    expect(merged.protectedBranches).toEqual(["main", "release"]);
+    expect(merged.gateCommits).toBe(true);
+  });
 });
 
 describe("applyGenerateOptions", () => {
