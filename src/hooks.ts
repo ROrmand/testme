@@ -183,16 +183,16 @@ export function beforeCommitHook(
   };
 }
 
-export function beforePushHook(
+export function parseRemoteRef(remoteRef: string): string | null {
+  const match = remoteRef.match(/^refs\/heads\/(.+)$/);
+  return match?.[1] ?? null;
+}
+
+function evaluateProtectedPush(
   cwd: string,
-  command: string,
+  targetBranch: string,
   cliBranch?: string,
 ): HookResult {
-  const targetBranch = parsePushBranch(command, cwd);
-  if (!targetBranch) {
-    return { permission: "allow" };
-  }
-
   const protectedBranches = resolveProtectedBranches(cwd, cliBranch);
 
   if (!protectedBranches.includes(targetBranch)) {
@@ -210,6 +210,32 @@ export function beforePushHook(
     user_message: message,
     agent_message: message,
   };
+}
+
+export function beforePushRefHook(
+  cwd: string,
+  remoteRef: string,
+  cliBranch?: string,
+): HookResult {
+  const targetBranch = parseRemoteRef(remoteRef);
+  if (!targetBranch) {
+    return { permission: "allow" };
+  }
+
+  return evaluateProtectedPush(cwd, targetBranch, cliBranch);
+}
+
+export function beforePushHook(
+  cwd: string,
+  command: string,
+  cliBranch?: string,
+): HookResult {
+  const targetBranch = parsePushBranch(command, cwd);
+  if (!targetBranch) {
+    return { permission: "allow" };
+  }
+
+  return evaluateProtectedPush(cwd, targetBranch, cliBranch);
 }
 
 export function afterPushHook(cwd: string, command: string, cliBranch?: string): void {

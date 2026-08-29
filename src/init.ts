@@ -17,6 +17,8 @@ interface HooksConfig {
   hooks: Record<string, Array<Record<string, unknown>>>;
 }
 
+const GIT_HOOK_MARKER = "testme-managed hook";
+
 function copyIfMissing(source: string, target: string): boolean {
   if (existsSync(target)) {
     return false;
@@ -78,7 +80,7 @@ function ensureGitignoreEntry(cwd: string): void {
   writeFileSync(gitignorePath, content + block, "utf8");
 }
 
-function copyHookScripts(cwd: string): void {
+export function copyHookScripts(cwd: string): void {
   const hooksDir = path.join(TEMPLATES_DIR, "hooks");
   const targetDir = path.join(cwd, ".cursor", "hooks");
   mkdirSync(targetDir, { recursive: true });
@@ -91,6 +93,57 @@ function copyHookScripts(cwd: string): void {
     copyFileSync(path.join(hooksDir, file), target);
     chmodSync(target, 0o755);
   }
+}
+
+function installGitHookFile(
+  cwd: string,
+  hookName: string,
+  scriptName: string,
+): "installed" | "skipped" | "missing-git" {
+  const gitDir = path.join(cwd, ".git");
+  if (!existsSync(gitDir)) {
+    return "missing-git";
+  }
+
+  const hookPath = path.join(gitDir, "hooks", hookName);
+  if (existsSync(hookPath)) {
+    const existing = readFileSync(hookPath, "utf8");
+    if (!existing.includes(GIT_HOOK_MARKER)) {
+      return "skipped";
+    }
+  }
+
+  const scriptPath = `.cursor/hooks/${scriptName}`;
+  const content = `#!/bin/sh
+# ${GIT_HOOK_MARKER} — re-run npx testme init to refresh
+exec "$(git rev-parse --show-toplevel)/${scriptPath}" "$@"
+`;
+
+  mkdirSync(path.dirname(hookPath), { recursive: true });
+  writeFileSync(hookPath, content, "utf8");
+  chmodSync(hookPath, 0o755);
+
+  return "installed";
+}
+
+export function installGitHooks(cwd: string): string[] {
+  const results: string[] = [];
+  const push = installGitHookFile(cwd, "pre-push", "git-pre-push.sh");
+  const commit = installGitHookFile(cwd, "pre-commit", "git-pre-commit.sh");
+
+  if (push === "installed") {
+    results.push(".git/hooks/pre-push");
+  } else if (push === "skipped") {
+    results.push(".git/hooks/pre-push (skipped — existing non-testme hook)");
+  }
+
+  if (commit === "installed") {
+    results.push(".git/hooks/pre-commit");
+  } else if (commit === "skipped") {
+    results.push(".git/hooks/pre-commit (skipped — existing non-testme hook)");
+  }
+
+  return results;
 }
 
 export function initProject(cwd: string): string[] {
@@ -117,6 +170,10 @@ export function initProject(cwd: string): string[] {
   const hooksTarget = path.join(cwd, ".cursor", "hooks.json");
   mergeHooks(hooksTarget, path.join(TEMPLATES_DIR, "hooks.json"), hooksTarget);
   created.push(".cursor/hooks.json");
+
+  for (const item of installGitHooks(cwd)) {
+    created.push(item);
+  }
 
   const skillTarget = path.join(cwd, ".cursor", "skills", "testme", "SKILL.md");
   if (copyIfMissing(path.join(TEMPLATES_DIR, "SKILL.md"), skillTarget)) {

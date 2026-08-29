@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   beforeCommitHook,
   beforePushHook,
+  beforePushRefHook,
   commitBlockedMessage,
   getCurrentBranch,
   isPushToMain,
   parsePushBranch,
+  parseRemoteRef,
   pushBlockedMessage,
   resolveProtectedBranches,
 } from "./hooks.js";
@@ -57,6 +59,22 @@ describe("blocked messages", () => {
 
   it("uses a commit-specific message", () => {
     expect(commitBlockedMessage()).toBe("You must run the /testme skill before committing.");
+  });
+});
+
+describe("parseRemoteRef", () => {
+  it("extracts branch names from git pre-push refs", () => {
+    expect(parseRemoteRef("refs/heads/main")).toBe("main");
+    expect(parseRemoteRef("refs/heads/feature/auth")).toBe("feature/auth");
+    expect(parseRemoteRef("refs/tags/v1")).toBeNull();
+  });
+});
+
+describe("beforePushRefHook", () => {
+  it("denies protected branch refs without a valid pass", () => {
+    const result = beforePushRefHook("/tmp", "refs/heads/main");
+    expect(result.permission).toBe("deny");
+    expect(result.user_message).toBe(pushBlockedMessage("main"));
   });
 });
 

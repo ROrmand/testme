@@ -12,7 +12,8 @@ This installs into your repo:
 
 - `SUMMARY.md` — stable project map (stack, architecture, conventions)
 - `PROMPTS.md` — session change log (resets after successful push to `main`)
-- `.cursor/hooks.json` — blocks commit/push until verified
+- `.cursor/hooks.json` — blocks commit/push in the Cursor agent
+- `.git/hooks/pre-commit` and `pre-push` — blocks commit/push in any terminal (installed by `init`)
 - `.cursor/skills/testme/SKILL.md` — `/testme` workflow for agents
 
 ## Workflow
@@ -76,7 +77,8 @@ After a successful push, `PROMPTS.md` resets automatically.
 
 | Command | Description |
 |---------|-------------|
-| `testme init` | Install templates, hooks, skill, and `testme.config.json` |
+| `testme init` | Install templates, Cursor hooks, git hooks, skill, and `testme.config.json` |
+| `testme hook install-git` | Re-install git `pre-commit` / `pre-push` hooks only |
 | `testme generate` | Generate questions from diff + md files |
 | `testme generate --max-questions 3` | One-off question count override |
 | `testme generate --category runtime,testing` | One-off category filter |
@@ -106,6 +108,8 @@ Configure in `testme.config.json`:
 - `gateCommits` — when `true`, `git commit` is blocked until `/testme` passes
 
 Blocked push message: `You must run the /testme skill before pushing to 'main'.`
+
+**Terminal blocking:** `npx testme init` installs native git hooks into `.git/hooks/`. The Cursor integrated terminal does **not** run Cursor `beforeShellExecution` hooks — git hooks cover that gap.
 
 ### Question count
 

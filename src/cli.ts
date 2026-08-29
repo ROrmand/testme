@@ -6,8 +6,8 @@ import { detectProject } from "./detect.js";
 import { analyzeDiff } from "./diff.js";
 import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.js";
 import { resolveConfig } from "./generate.js";
-import { afterPushHook, beforeCommitHook, beforePushHook, resolveProtectedBranches, resolveWorkingBranch } from "./hooks.js";
-import { initProject, resetTestmeState } from "./init.js";
+import { afterPushHook, beforeCommitHook, beforePushHook, beforePushRefHook, resolveProtectedBranches, resolveWorkingBranch } from "./hooks.js";
+import { copyHookScripts, initProject, installGitHooks, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
 
@@ -249,6 +249,43 @@ hook
 
     console.error(result.agent_message ?? "Push blocked by testme.");
     process.exit(2);
+  });
+
+hook
+  .command("before-push-ref")
+  .description("Check whether a git pre-push ref should be allowed")
+  .requiredOption("-r, --remote-ref <ref>", "remote ref being pushed (e.g. refs/heads/main)")
+  .option("--json", "output hook JSON response")
+  .action((options, cmd) => {
+    const branch = cmd.parent?.parent?.opts().branch ?? undefined;
+    const result = beforePushRefHook(process.cwd(), options.remoteRef, branch);
+
+    if (options.json) {
+      console.log(JSON.stringify(result));
+      process.exit(result.permission === "allow" ? 0 : 2);
+    }
+
+    if (result.permission === "allow") {
+      process.exit(0);
+    }
+
+    console.error(result.agent_message ?? "Push blocked by testme.");
+    process.exit(2);
+  });
+
+hook
+  .command("install-git")
+  .description("Install git pre-commit and pre-push hooks into .git/hooks")
+  .action(() => {
+    copyHookScripts(process.cwd());
+    const installed = installGitHooks(process.cwd());
+    if (installed.length === 0) {
+      console.log("No git hooks installed (not a git repo or hooks already managed elsewhere).");
+      return;
+    }
+    for (const item of installed) {
+      console.log(`  + ${item}`);
+    }
   });
 
 hook

@@ -157,6 +157,7 @@ In `testme.config.json`:
 - `gateCommits: true` blocks `git commit` until `/testme` passes
 - `autoProtectCurrentBranch: true` (default) also protects your current branch — no config edits when switching branches
 - Pushes to protected branches are blocked with: `You must run the /testme skill before pushing to '<branch>'.`
+- `npx testme init` also installs **git** `pre-commit` / `pre-push` hooks (blocks the Cursor terminal and any other terminal)
 
 ## Token efficiency rules
 
