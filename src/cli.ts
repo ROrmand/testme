@@ -6,7 +6,7 @@ import { detectProject } from "./detect.js";
 import { analyzeDiff } from "./diff.js";
 import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.js";
 import { resolveConfig } from "./generate.js";
-import { afterPushHook, beforeCommitHook, beforePushHook } from "./hooks.js";
+import { afterPushHook, beforeCommitHook, beforePushHook, resolveProtectedBranches, resolveWorkingBranch } from "./hooks.js";
 import { initProject, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name("testme")
   .description("Comprehension gate for desktop coding agents")
-  .option("-b, --branch <name>", "protected branch", "main");
+  .option("-b, --branch <name>", "override working branch for diff and pass validation");
 
 program
   .command("init")
@@ -36,7 +36,7 @@ program
   .option("--min-questions <n>", "override min question count", (v) => Number.parseInt(v, 10))
   .option("--category <list>", "comma-separated category keys to enable for this run")
   .action((options, cmd) => {
-    const branch = cmd.parent?.opts().branch ?? "main";
+    const branch = resolveWorkingBranch(process.cwd(), cmd.parent?.opts().branch);
     const cwd = process.cwd();
 
     if (!promptsHasContent()) {
@@ -69,7 +69,7 @@ program
   .description("Show project-aware category suggestions")
   .action((_, cmd) => {
     const cwd = process.cwd();
-    const analysis = analyzeDiff(cwd, cmd.parent?.opts().branch ?? "main");
+    const analysis = analyzeDiff(cwd, resolveWorkingBranch(cwd, cmd.parent?.opts().branch));
     const detection = detectProject(cwd, analysis);
 
     console.log(`Domain: ${detection.domain ?? "(not set)"}`);
@@ -112,7 +112,7 @@ program
   .command("verify")
   .description("Verify answers in .testme/answers.json against the current session")
   .action((_, cmd) => {
-    const branch = cmd.parent?.opts().branch ?? "main";
+    const branch = resolveWorkingBranch(process.cwd(), cmd.parent?.opts().branch);
     const result = verifySession(process.cwd(), branch);
 
     if (result.questionScores && result.questionScores.length > 0) {
@@ -166,12 +166,16 @@ program
   .command("status")
   .description("Show whether the current pass is valid for the diff")
   .action((_, cmd) => {
-    const branch = cmd.parent?.opts().branch ?? "main";
     const cwd = process.cwd();
+    const cliBranch = cmd.parent?.opts().branch;
+    const branch = resolveWorkingBranch(cwd, cliBranch);
     const pass = loadPassFile();
     const valid = isPassValid(cwd, branch);
 
-    console.log(`Protected branch: ${branch}`);
+    console.log(`Working branch: ${branch}`);
+    console.log(
+      `Protected branches: ${resolveProtectedBranches(cwd, cliBranch).join(", ")}`,
+    );
     console.log(`Pass valid: ${valid ? "yes" : "no"}`);
 
     if (pass) {
@@ -208,8 +212,9 @@ hook
   .description("Check whether a git commit should be allowed")
   .requiredOption("-c, --command <cmd>", "shell command to evaluate")
   .option("--json", "output hook JSON response")
-  .action((options) => {
-    const result = beforeCommitHook(process.cwd(), options.command);
+  .action((options, cmd) => {
+    const branch = cmd.parent?.parent?.opts().branch;
+    const result = beforeCommitHook(process.cwd(), options.command, branch);
 
     if (options.json) {
       console.log(JSON.stringify(result));

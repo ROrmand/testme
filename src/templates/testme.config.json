@@ -26,5 +26,6 @@
   "grading": "semantic",
   "passThreshold": 70,
   "protectedBranches": ["main"],
-  "gateCommits": true
+  "gateCommits": true,
+  "autoProtectCurrentBranch": true
 }

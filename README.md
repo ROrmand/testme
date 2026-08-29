@@ -96,11 +96,13 @@ Configure in `testme.config.json`:
 ```json
 {
   "protectedBranches": ["main"],
-  "gateCommits": true
+  "gateCommits": true,
+  "autoProtectCurrentBranch": true
 }
 ```
 
-- `protectedBranches` — pushes to these branches require a valid `/testme` pass
+- `protectedBranches` — always-protected branches (e.g. `main`)
+- `autoProtectCurrentBranch` — also gate pushes to whatever branch you have checked out (default `true`)
 - `gateCommits` — when `true`, `git commit` is blocked until `/testme` passes
 
 Blocked push message: `You must run the /testme skill before pushing to 'main'.`

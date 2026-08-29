@@ -38,6 +38,7 @@ export const DEFAULT_CONFIG: TestmeConfig = {
   passThreshold: 70,
   protectedBranches: ["main"],
   gateCommits: false,
+  autoProtectCurrentBranch: true,
 };
 
 function readJsonFile(filePath: string): TestmeConfigInput | null {
@@ -83,6 +84,8 @@ export function mergeConfig(
     passThreshold: patch.passThreshold ?? base.passThreshold,
     protectedBranches: patch.protectedBranches ?? base.protectedBranches,
     gateCommits: patch.gateCommits ?? base.gateCommits,
+    autoProtectCurrentBranch:
+      patch.autoProtectCurrentBranch ?? base.autoProtectCurrentBranch,
     _detected: patch._detected ?? base._detected,
   };
 }

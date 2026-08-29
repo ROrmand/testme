@@ -36,6 +36,7 @@ describe("mergeConfig", () => {
 
     expect(merged.protectedBranches).toEqual(["main", "release"]);
     expect(merged.gateCommits).toBe(true);
+    expect(merged.autoProtectCurrentBranch).toBe(true);
   });
 });
 

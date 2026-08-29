@@ -165,6 +165,7 @@ export interface TestmeConfig {
   passThreshold: number;
   protectedBranches: string[];
   gateCommits: boolean;
+  autoProtectCurrentBranch: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 
@@ -177,6 +178,7 @@ export interface TestmeConfigInput {
   passThreshold?: number;
   protectedBranches?: string[];
   gateCommits?: boolean;
+  autoProtectCurrentBranch?: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
 

@@ -3,9 +3,11 @@ import {
   beforeCommitHook,
   beforePushHook,
   commitBlockedMessage,
+  getCurrentBranch,
   isPushToMain,
   parsePushBranch,
   pushBlockedMessage,
+  resolveProtectedBranches,
 } from "./hooks.js";
 
 describe("parsePushBranch", () => {
@@ -15,6 +17,7 @@ describe("parsePushBranch", () => {
     expect(parsePushBranch("git push origin HEAD:main")).toBe("main");
     expect(parsePushBranch("git push origin feature:main")).toBe("main");
     expect(parsePushBranch("git push origin refs/heads/main")).toBe("main");
+    expect(parsePushBranch("git push origin origin/main")).toBe("main");
   });
 
   it("returns null for non-push commands", () => {
@@ -24,6 +27,13 @@ describe("parsePushBranch", () => {
 
   it("returns null for dry-run pushes", () => {
     expect(parsePushBranch("git push --dry-run origin main")).toBeNull();
+  });
+
+  it("resolves bare git push and origin-only pushes to the upstream branch", () => {
+    const cwd = process.cwd();
+    expect(parsePushBranch("git push", cwd)).toBe("main");
+    expect(parsePushBranch("git push origin", cwd)).toBe("main");
+    expect(parsePushBranch("git push -u origin HEAD", cwd)).toBe("main");
   });
 });
 
@@ -47,6 +57,19 @@ describe("blocked messages", () => {
 
   it("uses a commit-specific message", () => {
     expect(commitBlockedMessage()).toBe("You must run the /testme skill before committing.");
+  });
+});
+
+describe("resolveProtectedBranches", () => {
+  it("includes configured branches and the current checkout", () => {
+    const cwd = process.cwd();
+    const current = getCurrentBranch(cwd);
+    const protectedBranches = resolveProtectedBranches(cwd);
+
+    expect(protectedBranches).toContain("main");
+    if (current) {
+      expect(protectedBranches).toContain(current);
+    }
   });
 });
 

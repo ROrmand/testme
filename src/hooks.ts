@@ -21,8 +21,61 @@ function runGit(args: string[], cwd: string): string {
   }
 }
 
+export function normalizeBranchRef(ref: string): string {
+  const withoutRefs = ref.replace(/^refs\/heads\//, "");
+  const slash = withoutRefs.lastIndexOf("/");
+  if (slash >= 0) {
+    return withoutRefs.slice(slash + 1);
+  }
+  return withoutRefs;
+}
+
 function normalizeBranch(ref: string): string {
-  return ref.replace(/^refs\/heads\//, "");
+  return normalizeBranchRef(ref);
+}
+
+export function getCurrentBranch(cwd: string): string | null {
+  const head = runGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+  if (!head || head === "HEAD") {
+    return null;
+  }
+  return normalizeBranch(head);
+}
+
+/** Branch used for diff analysis and pass validation. */
+export function resolveWorkingBranch(cwd: string, cliBranch?: string): string {
+  if (cliBranch) {
+    return cliBranch;
+  }
+
+  const config = loadConfig(cwd);
+  if (config.autoProtectCurrentBranch) {
+    const current = getCurrentBranch(cwd);
+    if (current) {
+      return current;
+    }
+  }
+
+  return config.protectedBranches[0] ?? "main";
+}
+
+/** Protected push targets: config list + current branch (when enabled). */
+export function resolveProtectedBranches(cwd: string, cliBranch?: string): string[] {
+  const config = loadConfig(cwd);
+  const branches = [...config.protectedBranches];
+
+  if (config.autoProtectCurrentBranch) {
+    const current = getCurrentBranch(cwd);
+    if (current) {
+      branches.push(current);
+    }
+  }
+
+  if (cliBranch) {
+    branches.push(cliBranch);
+  }
+
+  return [...new Set(branches)];
 }
 
 function tokenizeShell(command: string): string[] {
@@ -63,6 +116,10 @@ export function parsePushBranch(command: string, cwd?: string): string | null {
 
   if (positional.length >= 2) {
     const refspec = positional[1];
+    if (refspec.toUpperCase() === "HEAD" && cwd) {
+      const head = runGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+      return head ? normalizeBranch(head) : null;
+    }
     if (refspec.includes(":")) {
       const remotePart = refspec.split(":").at(-1);
       return remotePart ? normalizeBranch(remotePart) : null;
@@ -73,8 +130,7 @@ export function parsePushBranch(command: string, cwd?: string): string | null {
   if (cwd) {
     const pushRef = runGit(["rev-parse", "--abbrev-ref", "@{push}"], cwd);
     if (pushRef) {
-      const remotePart = pushRef.includes(":") ? pushRef.split(":").at(-1) : pushRef;
-      return remotePart ? normalizeBranch(remotePart) : null;
+      return normalizeBranch(pushRef);
     }
   }
 
@@ -100,15 +156,11 @@ export function commitBlockedMessage(): string {
   return "You must run the /testme skill before committing.";
 }
 
-function primaryBranch(cwd: string, cliBranch?: string): string {
-  const config = loadConfig(cwd);
-  if (cliBranch) {
-    return cliBranch;
-  }
-  return config.protectedBranches[0] ?? "main";
-}
-
-export function beforeCommitHook(cwd: string, command: string): HookResult {
+export function beforeCommitHook(
+  cwd: string,
+  command: string,
+  cliBranch?: string,
+): HookResult {
   if (!/^git\s+commit\b/.test(command.trim())) {
     return { permission: "allow" };
   }
@@ -118,7 +170,7 @@ export function beforeCommitHook(cwd: string, command: string): HookResult {
     return { permission: "allow" };
   }
 
-  const branch = primaryBranch(cwd);
+  const branch = resolveWorkingBranch(cwd, cliBranch);
   if (isPassValid(cwd, branch)) {
     return { permission: "allow" };
   }
@@ -141,16 +193,13 @@ export function beforePushHook(
     return { permission: "allow" };
   }
 
-  const config = loadConfig(cwd);
-  const protectedBranches = cliBranch
-    ? [...new Set([cliBranch, ...config.protectedBranches])]
-    : config.protectedBranches;
+  const protectedBranches = resolveProtectedBranches(cwd, cliBranch);
 
   if (!protectedBranches.includes(targetBranch)) {
     return { permission: "allow" };
   }
 
-  const passBranch = primaryBranch(cwd, cliBranch);
+  const passBranch = resolveWorkingBranch(cwd, cliBranch);
   if (isPassValid(cwd, passBranch)) {
     return { permission: "allow" };
   }
@@ -169,10 +218,7 @@ export function afterPushHook(cwd: string, command: string, cliBranch?: string):
     return;
   }
 
-  const config = loadConfig(cwd);
-  const protectedBranches = cliBranch
-    ? [...new Set([cliBranch, ...config.protectedBranches])]
-    : config.protectedBranches;
+  const protectedBranches = resolveProtectedBranches(cwd, cliBranch);
 
   if (!protectedBranches.includes(targetBranch)) {
     return;
