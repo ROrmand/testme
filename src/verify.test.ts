@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { JudgmentsFile, Session } from "./types.js";
+import type { JudgmentsFile, PassFile, Session } from "./types.js";
 import {
   isQuestionPassing,
   normalizeJudgment,
+  passStillValid,
   verifyAnswersSemantic,
 } from "./verify.js";
 
@@ -56,6 +57,65 @@ describe("isQuestionPassing", () => {
         70,
       ),
     ).toBe(true);
+  });
+});
+
+describe("passStillValid", () => {
+  const basePass: PassFile = {
+    diffHash: "verified-hash",
+    score: 100,
+    verifiedAt: "",
+    questionsAnswered: 2,
+    headSha: "commit-before",
+    hadUncommitted: true,
+  };
+
+  it("accepts when diff hash still matches", () => {
+    expect(
+      passStillValid({
+        pass: basePass,
+        currentDiffHash: "verified-hash",
+        headSha: "commit-before",
+        hasUncommitted: true,
+        verifiedHeadIsAncestor: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts after committing verified uncommitted work", () => {
+    expect(
+      passStillValid({
+        pass: basePass,
+        currentDiffHash: "new-hash-after-commit",
+        headSha: "commit-after",
+        hasUncommitted: false,
+        verifiedHeadIsAncestor: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts same commit with clean tree when hash drifted", () => {
+    expect(
+      passStillValid({
+        pass: { ...basePass, hadUncommitted: false },
+        currentDiffHash: "different-hash",
+        headSha: "commit-before",
+        hasUncommitted: false,
+        verifiedHeadIsAncestor: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects new uncommitted edits after verify", () => {
+    expect(
+      passStillValid({
+        pass: basePass,
+        currentDiffHash: "different-hash",
+        headSha: "commit-before",
+        hasUncommitted: true,
+        verifiedHeadIsAncestor: true,
+      }),
+    ).toBe(false);
   });
 });
 

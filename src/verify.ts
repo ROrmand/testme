@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadConfig } from "./config.js";
-import { analyzeDiff } from "./diff.js";
+import { analyzeDiff, getHeadSha, hasUncommittedChanges, isGitAncestor } from "./diff.js";
 import {
   ANSWERS_PATH,
   JUDGMENTS_PATH,
@@ -279,6 +279,8 @@ export function verifySession(cwd: string, branch = "main"): VerifyResult {
       score: result.score,
       verifiedAt: new Date().toISOString(),
       questionsAnswered: session.questions.length,
+      headSha: getHeadSha(cwd),
+      hadUncommitted: hasUncommittedChanges(cwd),
     };
 
     mkdirSync(TESTME_DIR, { recursive: true });
@@ -296,14 +298,64 @@ export function loadPassFile(): PassFile | null {
   return JSON.parse(readFileSync(PASS_PATH, "utf8")) as PassFile;
 }
 
+export function passStillValid(options: {
+  pass: PassFile;
+  currentDiffHash: string;
+  headSha: string;
+  hasUncommitted: boolean;
+  verifiedHeadIsAncestor: boolean;
+}): boolean {
+  const { pass, currentDiffHash, headSha, hasUncommitted, verifiedHeadIsAncestor } =
+    options;
+
+  if (pass.diffHash === currentDiffHash) {
+    return true;
+  }
+
+  if (!pass.headSha) {
+    return false;
+  }
+
+  if (
+    pass.hadUncommitted &&
+    !hasUncommitted &&
+    headSha !== pass.headSha &&
+    verifiedHeadIsAncestor
+  ) {
+    return true;
+  }
+
+  if (pass.headSha === headSha && !hasUncommitted) {
+    return true;
+  }
+
+  return false;
+}
+
+export function evaluatePassValidity(
+  pass: PassFile,
+  cwd: string,
+  branch = "main",
+): boolean {
+  const headSha = getHeadSha(cwd);
+  return passStillValid({
+    pass,
+    currentDiffHash: analyzeDiff(cwd, branch).diffHash,
+    headSha,
+    hasUncommitted: hasUncommittedChanges(cwd),
+    verifiedHeadIsAncestor: pass.headSha
+      ? isGitAncestor(pass.headSha, headSha, cwd)
+      : false,
+  });
+}
+
 export function isPassValid(cwd: string, branch = "main"): boolean {
   const pass = loadPassFile();
   if (!pass) {
     return false;
   }
 
-  const current = analyzeDiff(cwd, branch);
-  return pass.diffHash === current.diffHash;
+  return evaluatePassValidity(pass, cwd, branch);
 }
 
 // Backwards-compatible export used in tests

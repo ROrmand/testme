@@ -49,7 +49,28 @@ export function resolveBaseRef(cwd: string, branch = "main"): string {
   return branch;
 }
 
+export function getHeadSha(cwd: string): string {
+  return runGit(["rev-parse", "HEAD"], cwd);
+}
+
+export function hasUncommittedChanges(cwd: string): boolean {
+  return Boolean(runGit(["diff", "--cached"], cwd) || runGit(["diff"], cwd));
+}
+
+export function isGitAncestor(ancestor: string, descendant: string, cwd: string): boolean {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
+      cwd,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getDiffText(cwd: string, baseRef: string, branch = "main"): string {
+  const parts: string[] = [];
   const rangeCandidates = new Set<string>();
   if (baseRef && baseRef !== "HEAD") {
     rangeCandidates.add(`${baseRef}...HEAD`);
@@ -62,15 +83,22 @@ export function getDiffText(cwd: string, baseRef: string, branch = "main"): stri
   for (const range of rangeCandidates) {
     const rangeDiff = runGit(["diff", range], cwd);
     if (rangeDiff) {
-      return rangeDiff;
+      parts.push(rangeDiff);
+      break;
     }
   }
 
   const staged = runGit(["diff", "--cached"], cwd);
   const unstaged = runGit(["diff"], cwd);
-  const working = [staged, unstaged].filter(Boolean).join("\n");
-  if (working) {
-    return working;
+  if (staged) {
+    parts.push(staged);
+  }
+  if (unstaged) {
+    parts.push(unstaged);
+  }
+
+  if (parts.length > 0) {
+    return parts.join("\n");
   }
 
   const rootDiff = runGit(["diff", "--root", "HEAD"], cwd);

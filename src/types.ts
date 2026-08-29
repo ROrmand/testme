@@ -82,6 +82,8 @@ export interface PassFile {
   score: number;
   verifiedAt: string;
   questionsAnswered: number;
+  headSha?: string;
+  hadUncommitted?: boolean;
 }
 
 export interface FileChange {
