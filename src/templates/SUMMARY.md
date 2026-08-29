@@ -22,3 +22,8 @@ Keep this file updated when architecture, stack, or major conventions change —
 
 - How to run locally:
 - How to run tests:
+
+## Domain
+
+- Primary:
+- Focus areas:

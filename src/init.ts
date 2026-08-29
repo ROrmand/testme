@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { TEMPLATES_DIR } from "./paths.js";
+import { initConfig } from "./config-init.js";
 
 interface HooksConfig {
   version: number;
@@ -66,10 +67,9 @@ function mergeHooks(existingPath: string, templatePath: string, targetPath: stri
 
 function ensureGitignoreEntry(cwd: string): void {
   const gitignorePath = path.join(cwd, ".gitignore");
-  const entry = ".testme/";
   const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
 
-  if (content.split("\n").some((line) => line.trim() === entry || line.trim() === ".testme")) {
+  if (content.includes(".testme/")) {
     return;
   }
 
@@ -105,6 +105,11 @@ export function initProject(cwd: string): string[] {
 
   if (copyIfMissing(path.join(TEMPLATES_DIR, "PROMPTS.md"), promptsTarget)) {
     created.push("PROMPTS.md");
+  }
+
+  const configResult = initConfig(cwd);
+  if (configResult.created) {
+    created.push("testme.config.json");
   }
 
   copyHookScripts(cwd);

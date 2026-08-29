@@ -1,0 +1,29 @@
+{
+  "questions": {
+    "min": 2,
+    "max": 5
+  },
+  "categories": {
+    "changeRationale": true,
+    "symbols": true,
+    "architecture": true,
+    "runtime": false,
+    "dataStructures": false,
+    "dependencies": false,
+    "testing": false,
+    "errorHandling": false,
+    "apiContracts": false,
+    "security": false,
+    "performance": false,
+    "database": false,
+    "machineLearning": false,
+    "cybersecurity": false,
+    "frontend": false,
+    "backend": false,
+    "devops": false,
+    "mobile": false,
+    "dataEngineering": false
+  },
+  "autoDetect": true,
+  "domain": null
+}

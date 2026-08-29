@@ -91,6 +91,7 @@ describe("verifyAnswers", () => {
   const question: Question = {
     id: "q1",
     type: "change_rationale",
+    category: "changeRationale",
     prompt: "What changed?",
     files: ["src/auth.ts"],
     rubric: {

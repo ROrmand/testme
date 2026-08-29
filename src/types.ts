@@ -1,4 +1,57 @@
-export type QuestionType = "change_rationale" | "symbol" | "architecture";
+export type QuestionType = "change_rationale" | "symbol" | "architecture" | "category";
+
+export type CategoryKey =
+  | "changeRationale"
+  | "symbols"
+  | "architecture"
+  | "runtime"
+  | "dataStructures"
+  | "dependencies"
+  | "testing"
+  | "errorHandling"
+  | "apiContracts"
+  | "security"
+  | "performance"
+  | "database"
+  | "machineLearning"
+  | "cybersecurity"
+  | "frontend"
+  | "backend"
+  | "devops"
+  | "mobile"
+  | "dataEngineering";
+
+export const ALL_CATEGORY_KEYS: CategoryKey[] = [
+  "changeRationale",
+  "symbols",
+  "architecture",
+  "runtime",
+  "dataStructures",
+  "dependencies",
+  "testing",
+  "errorHandling",
+  "apiContracts",
+  "security",
+  "performance",
+  "database",
+  "machineLearning",
+  "cybersecurity",
+  "frontend",
+  "backend",
+  "devops",
+  "mobile",
+  "dataEngineering",
+];
+
+export const DOMAIN_CATEGORY_KEYS: CategoryKey[] = [
+  "machineLearning",
+  "cybersecurity",
+  "frontend",
+  "backend",
+  "devops",
+  "mobile",
+  "dataEngineering",
+];
 
 export interface Rubric {
   requiredTerms: string[];
@@ -9,6 +62,7 @@ export interface Rubric {
 export interface Question {
   id: string;
   type: QuestionType;
+  category: CategoryKey;
   prompt: string;
   files: string[];
   rubric: Rubric;
@@ -56,4 +110,53 @@ export interface VerifyResult {
 export interface PromptsSection {
   file: string;
   bullets: string[];
+}
+
+export type CategoryFlags = Partial<Record<CategoryKey, boolean>>;
+
+export interface QuestionsConfig {
+  min: number;
+  max: number;
+}
+
+export interface TestmeConfig {
+  questions: QuestionsConfig;
+  categories: Record<CategoryKey, boolean>;
+  autoDetect: boolean;
+  domain: string | null;
+  _detected?: Record<string, { confidence: number; reason: string }>;
+}
+
+export interface TestmeConfigInput {
+  questions?: Partial<QuestionsConfig>;
+  categories?: CategoryFlags;
+  autoDetect?: boolean;
+  domain?: string | null;
+  _detected?: Record<string, { confidence: number; reason: string }>;
+}
+
+export interface GenerateOptions {
+  maxQuestions?: number;
+  minQuestions?: number;
+  categories?: CategoryKey[];
+}
+
+export interface CategorySuggestion {
+  enabled: boolean;
+  confidence: number;
+  reason: string;
+}
+
+export interface DetectionResult {
+  suggestedCategories: Partial<Record<CategoryKey, CategorySuggestion>>;
+  domain: string | null;
+}
+
+export interface QuestionCandidate {
+  category: CategoryKey;
+  type: QuestionType;
+  prompt: string;
+  files: string[];
+  rubric: Rubric;
+  priority: number;
 }

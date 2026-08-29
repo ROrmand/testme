@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { generateSession } from "./generate.js";
+import { formatConfigForDisplay, initConfig, showConfig } from "./config-init.js";
+import { detectProject } from "./detect.js";
+import { analyzeDiff } from "./diff.js";
+import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.js";
+import { resolveConfig } from "./generate.js";
 import { beforePushHook } from "./hooks.js";
 import { initProject, resetPromptsAfterPush, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
@@ -28,20 +32,80 @@ program
 program
   .command("generate")
   .description("Generate comprehension questions from SUMMARY.md, PROMPTS.md, and git diff")
-  .action((_, cmd) => {
+  .option("--max-questions <n>", "override max question count", (v) => Number.parseInt(v, 10))
+  .option("--min-questions <n>", "override min question count", (v) => Number.parseInt(v, 10))
+  .option("--category <list>", "comma-separated category keys to enable for this run")
+  .action((options, cmd) => {
     const branch = cmd.parent?.opts().branch ?? "main";
+    const cwd = process.cwd();
 
     if (!promptsHasContent()) {
       console.warn("Warning: PROMPTS.md has no change bullets yet. Add session notes for better rubrics.");
     }
 
-    const session = generateSession(process.cwd(), branch);
+    const generateOptions = {
+      maxQuestions: options.maxQuestions,
+      minQuestions: options.minQuestions,
+      categories: options.category ? parseCategoryList(options.category) : undefined,
+    };
+
+    const config = resolveConfig(cwd, generateOptions);
+    const session = generateSession(cwd, branch, generateOptions);
+    const warning = warnIfBelowMin(session, config);
+
     console.log(`Generated ${session.questions.length} question(s).`);
+    if (warning) {
+      console.warn(warning);
+    }
     console.log(`Session written to .testme/session.json`);
     console.log(`Diff base: ${session.baseRef}`);
     for (const question of session.questions) {
-      console.log(`  - ${question.id}: ${question.prompt}`);
+      console.log(`  - ${question.id} [${question.category}]: ${question.prompt}`);
     }
+  });
+
+program
+  .command("detect")
+  .description("Show project-aware category suggestions")
+  .action((_, cmd) => {
+    const cwd = process.cwd();
+    const analysis = analyzeDiff(cwd, cmd.parent?.opts().branch ?? "main");
+    const detection = detectProject(cwd, analysis);
+
+    console.log(`Domain: ${detection.domain ?? "(not set)"}`);
+    const entries = Object.entries(detection.suggestedCategories);
+    if (entries.length === 0) {
+      console.log("No domain categories detected.");
+      return;
+    }
+
+    for (const [key, suggestion] of entries) {
+      console.log(
+        `  ${key}: ${suggestion.enabled ? "on" : "off"} (${Math.round(suggestion.confidence * 100)}%) — ${suggestion.reason}`,
+      );
+    }
+  });
+
+const configCmd = program.command("config").description("Manage testme configuration");
+
+configCmd
+  .command("init")
+  .description("Create testme.config.json with auto-detected category defaults")
+  .option("--force", "overwrite existing testme.config.json")
+  .action((options) => {
+    const result = initConfig(process.cwd(), Boolean(options.force));
+    if (result.created) {
+      console.log(`Created ${result.path}`);
+    } else {
+      console.log(`${result.path} already exists (use --force to overwrite)`);
+    }
+  });
+
+configCmd
+  .command("show")
+  .description("Print merged config (defaults + repo + local overrides)")
+  .action(() => {
+    console.log(formatConfigForDisplay(showConfig(process.cwd())));
   });
 
 program

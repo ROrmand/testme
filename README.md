@@ -77,13 +77,92 @@ After a successful push, `PROMPTS.md` resets automatically.
 
 | Command | Description |
 |---------|-------------|
-| `testme init` | Install templates, hooks, and skill |
+| `testme init` | Install templates, hooks, skill, and `testme.config.json` |
 | `testme generate` | Generate questions from diff + md files |
+| `testme generate --max-questions 3` | One-off question count override |
+| `testme generate --category runtime,testing` | One-off category filter |
+| `testme detect` | Show auto-detected domain categories |
+| `testme config init` | Create `testme.config.json` with detected defaults |
+| `testme config show` | Print merged config (repo + local overrides) |
 | `testme verify` | Score answers in `.testme/answers.json` |
 | `testme status` | Check if current pass is valid |
 | `testme reset` | Clear `.testme/` session state |
-| `testme hook before-push` | Cursor hook helper (internal) |
-| `testme hook after-push` | Reset after push (internal) |
+
+## Customization
+
+### Question count
+
+Configure in `testme.config.json`:
+
+```json
+{
+  "questions": { "min": 2, "max": 5 }
+}
+```
+
+Local override in `.testme/config.json` (gitignored via `.testme/`):
+
+```json
+{ "questions": { "max": 3 } }
+```
+
+### Category checkboxes
+
+Each category is a boolean in `categories`. Core categories work everywhere; domain categories are auto-suggested when relevant.
+
+| Category | Focus |
+|----------|-------|
+| `changeRationale` | What changed per file and why |
+| `symbols` | What added/changed symbols do |
+| `architecture` | Fit with SUMMARY.md structure |
+| `runtime` | Run, test, deploy impact |
+| `dataStructures` | Algorithms and data structures used |
+| `dependencies` | Package/manifest changes |
+| `testing` | Test coverage and assertions |
+| `errorHandling` | Errors and edge cases |
+| `apiContracts` | API/schema/interface changes |
+| `security` | Auth, validation, secrets |
+| `performance` | Caching, complexity, bottlenecks |
+| `database` | Schema, queries, migrations |
+| `machineLearning` | Training, inference, metrics |
+| `cybersecurity` | Threat model, mitigations |
+| `frontend` | UI components and state |
+| `backend` | Routes, middleware, services |
+| `devops` | CI/CD, containers, infra |
+| `mobile` | Platform-specific behavior |
+| `dataEngineering` | Pipelines, ETL, lineage |
+
+### Project-aware detection
+
+```bash
+npx testme detect
+```
+
+Signals: `SUMMARY.md` `## Domain` section, `package.json`/`pyproject.toml` deps, diff file paths.
+
+**ML example** — `testme detect` enables `machineLearning`; disable `cybersecurity` in config.
+
+**Security example** — enable `cybersecurity` and `security`; leave `machineLearning` false.
+
+```json
+{
+  "autoDetect": true,
+  "categories": {
+    "machineLearning": true,
+    "dataStructures": true,
+    "cybersecurity": false
+  }
+}
+```
+
+Add to `SUMMARY.md`:
+
+```markdown
+## Domain
+
+- Primary: machine learning
+- Focus areas: model training, evaluation metrics, inference API
+```
 
 ## Why PROMPTS.md matters
 
@@ -92,7 +171,7 @@ After a successful push, `PROMPTS.md` resets automatically.
 ## Token efficiency
 
 - No full-repo scans — only git diff metadata + two md files
-- Max 5 questions per session
+- Configurable question count and categories via `testme.config.json`
 - Targeted file reads via `files[]` pointers in session
 - Zero LLM calls for verification
 

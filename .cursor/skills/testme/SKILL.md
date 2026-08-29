@@ -96,6 +96,70 @@ After a successful push, `PROMPTS.md` resets automatically via hook.
 
 Update only when architecture, stack, or major conventions change — not every commit.
 
+Add a `## Domain` section to steer auto-detection:
+
+```markdown
+## Domain
+
+- Primary: machine learning
+- Focus areas: model training, evaluation metrics, inference API
+```
+
+## Configure categories
+
+Question count and knowledge areas are configured in `testme.config.json` (team defaults) with optional local overrides in `.testme/config.json`.
+
+### Checkbox-style categories
+
+Set booleans in `categories` — `true` enables, `false` disables:
+
+```json
+{
+  "questions": { "min": 2, "max": 5 },
+  "categories": {
+    "changeRationale": true,
+    "symbols": true,
+    "architecture": true,
+    "runtime": false,
+    "dataStructures": false,
+    "testing": true,
+    "machineLearning": false,
+    "cybersecurity": false
+  },
+  "autoDetect": true
+}
+```
+
+### Core categories
+
+`changeRationale`, `symbols`, `architecture`, `runtime`, `dataStructures`, `dependencies`, `testing`, `errorHandling`, `apiContracts`, `security`, `performance`, `database`
+
+### Domain categories (auto-suggested)
+
+`machineLearning`, `cybersecurity`, `frontend`, `backend`, `devops`, `mobile`, `dataEngineering`
+
+Run detection before editing config:
+
+```bash
+npx testme detect
+npx testme config init
+npx testme config show
+```
+
+### One-off overrides
+
+```bash
+npx testme generate --max-questions 3 --category changeRationale,runtime,testing
+```
+
+### Examples
+
+**Machine learning project** — enable `machineLearning`, `dataStructures`; disable `cybersecurity`.
+
+**Security tooling project** — enable `cybersecurity`, `security`; disable `machineLearning`.
+
+Ask the user which categories matter if unclear, then update `testme.config.json`.
+
 ## Troubleshooting
 
 | Issue | Fix |
