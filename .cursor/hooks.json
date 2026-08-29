@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/block-push.sh",
+        "matcher": "git\\s+push",
+        "failClosed": true
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/after-push.sh",
+        "matcher": "git\\s+push"
+      }
+    ]
+  }
+}

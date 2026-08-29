@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.testme/
+*.tsbuildinfo

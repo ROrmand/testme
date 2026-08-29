@@ -1,0 +1,38 @@
+{
+  "name": "testme",
+  "version": "0.1.0",
+  "description": "Comprehension gate for desktop coding agents — block git push to main until you pass a deterministic test",
+  "type": "module",
+  "bin": {
+    "testme": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src/templates"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --experimental-vm-modules node_modules/vitest/vitest.mjs run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cursor",
+    "agent",
+    "git",
+    "comprehension",
+    "hooks"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}
