@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG: TestmeConfig = {
   domain: null,
   grading: "semantic",
   passThreshold: 70,
+  minAlignment: "medium",
   protectedBranches: ["main"],
   gateCommits: false,
   autoProtectCurrentBranch: true,
@@ -82,6 +83,8 @@ export function mergeConfig(
     domain: patch.domain !== undefined ? patch.domain : base.domain,
     grading: patch.grading ?? base.grading,
     passThreshold: patch.passThreshold ?? base.passThreshold,
+    minAlignment: patch.minAlignment ?? base.minAlignment,
+    difficulty: patch.difficulty ?? base.difficulty,
     protectedBranches: patch.protectedBranches ?? base.protectedBranches,
     gateCommits: patch.gateCommits ?? base.gateCommits,
     autoProtectCurrentBranch:

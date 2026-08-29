@@ -8,13 +8,43 @@ Comprehension gate for desktop coding agents. **testme** blocks `git commit` (wh
 npx testme init
 ```
 
-This installs into your repo:
+The setup wizard detects your desktop agent (Cursor, Claude Code, Windsurf), asks how many questions you want and how difficult they should be, then installs the integration.
+
+Non-interactive example:
+
+```bash
+npx testme init --agent cursor --questions 3 --difficulty medium --yes
+```
+
+### What gets installed
+
+**Committed (team-shared):**
 
 - `SUMMARY.md` — stable project map (stack, architecture, conventions)
 - `PROMPTS.md` — session change log (resets after successful push to `main`)
-- `.cursor/hooks.json` — blocks commit/push in the Cursor agent
-- `.git/hooks/pre-commit` and `pre-push` — blocks commit/push in any terminal (installed by `init`)
-- `.cursor/skills/testme/SKILL.md` — `/testme` workflow for agents
+- `testme.config.json` — question count, difficulty, protected branches
+- `AGENTS.md` — portable workflow section (when selected)
+
+**Local only (gitignored — each developer runs `npx testme init` after clone):**
+
+- `.testme/` — session state and hook scripts
+- `.cursor/skills/testme/`, `.claude/skills/testme/`, `.windsurf/skills/testme/` — agent skills
+- Agent hook configs (`.cursor/hooks.json`, `.claude/settings.json`, `.windsurf/hooks.json`) when testme-only
+
+**Always installed per machine:**
+
+- `.git/hooks/pre-commit` and `pre-push` — blocks commit/push in any terminal
+
+### Supported agents
+
+| Agent | Integration |
+|-------|-------------|
+| Cursor | `.cursor/hooks.json` + `/testme` skill |
+| Claude Code | `.claude/settings.json` PreToolUse hooks + skill |
+| Windsurf | `.windsurf/hooks.json` pre_run_command hooks + skill |
+| AGENTS.md | Portable workflow docs (fallback) |
+
+Git hooks are the universal safety net when agent shell hooks are unavailable (e.g. some Claude Desktop sessions).
 
 ## Workflow
 
@@ -77,7 +107,9 @@ After a successful push, `PROMPTS.md` resets automatically.
 
 | Command | Description |
 |---------|-------------|
-| `testme init` | Install templates, Cursor hooks, git hooks, skill, and `testme.config.json` |
+| `testme init` | Interactive setup wizard: detect agent, configure questions/difficulty, install hooks and skills |
+| `testme init --agent all --yes` | Install all agent integrations without prompts |
+| `testme init --questions 5 --difficulty hard --force` | Override question count and difficulty |
 | `testme hook install-git` | Re-install git `pre-commit` / `pre-push` hooks only |
 | `testme generate` | Generate questions from diff + md files |
 | `testme generate --max-questions 3` | One-off question count override |
@@ -111,7 +143,26 @@ Blocked push message: `You must run the /testme skill before pushing to 'main'.`
 
 **Terminal blocking:** `npx testme init` installs native git hooks into `.git/hooks/`. The Cursor integrated terminal does **not** run Cursor `beforeShellExecution` hooks — git hooks cover that gap.
 
-### Question count
+### Question count and difficulty
+
+Set during `testme init` or in `testme.config.json`:
+
+| Difficulty | Pass threshold | Alignment required | Categories |
+|------------|----------------|--------------------|------------|
+| easy | 60% | low+ | changeRationale, symbols |
+| medium | 70% | medium+ | balanced + auto-detect |
+| hard | 85% | high only | + architecture, runtime, security |
+
+```json
+{
+  "questions": { "min": 2, "max": 3 },
+  "difficulty": "medium",
+  "passThreshold": 70,
+  "minAlignment": "medium"
+}
+```
+
+### Question count (generate)
 
 Configure in `testme.config.json`:
 

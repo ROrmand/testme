@@ -17,6 +17,7 @@ import type {
   ReferencesFile,
   Session,
   VerifyResult,
+  AlignmentLevel,
 } from "./types.js";
 
 function escapeRegex(value: string): string {
@@ -116,6 +117,19 @@ export function normalizeJudgment(judgment: {
   return ALIGNMENT_SCORE[judgment.alignment] ?? 0;
 }
 
+const ALIGNMENT_RANK: Record<AlignmentLevel, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+function alignmentMeetsMinimum(
+  alignment: "low" | "medium" | "high",
+  minAlignment: AlignmentLevel = "medium",
+): boolean {
+  return ALIGNMENT_RANK[alignment] >= ALIGNMENT_RANK[minAlignment];
+}
+
 export function isQuestionPassing(
   judgment: {
     passed: boolean;
@@ -123,12 +137,13 @@ export function isQuestionPassing(
     alignment: "low" | "medium" | "high";
   },
   passThreshold: number,
+  minAlignment: AlignmentLevel = "medium",
 ): boolean {
   const accuracy = normalizeJudgment(judgment);
   return (
     judgment.passed &&
     accuracy >= passThreshold &&
-    (judgment.alignment === "high" || judgment.alignment === "medium")
+    alignmentMeetsMinimum(judgment.alignment, minAlignment)
   );
 }
 
@@ -136,6 +151,7 @@ export function verifyAnswersSemantic(
   session: Session,
   judgments: JudgmentsFile,
   passThreshold = 70,
+  minAlignment: AlignmentLevel = "medium",
 ): VerifyResult {
   const failures: VerifyResult["failures"] = [];
   const questionScores: NonNullable<VerifyResult["questionScores"]> = [];
@@ -154,7 +170,7 @@ export function verifyAnswersSemantic(
     }
 
     const accuracy = normalizeJudgment(judgment);
-    const passed = isQuestionPassing(judgment, passThreshold);
+    const passed = isQuestionPassing(judgment, passThreshold, minAlignment);
 
     questionScores.push({
       id: question.id,
@@ -270,7 +286,12 @@ export function verifySession(cwd: string, branch = "main"): VerifyResult {
         "Judgments are stale. Re-grade answers against the current session.",
       );
     }
-    result = verifyAnswersSemantic(session, judgments, config.passThreshold);
+    result = verifyAnswersSemantic(
+      session,
+      judgments,
+      config.passThreshold,
+      config.minAlignment ?? "medium",
+    );
   }
 
   if (result.passed) {

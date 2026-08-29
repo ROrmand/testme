@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { Command } from "commander";
 import { formatConfigForDisplay, initConfig, showConfig } from "./config-init.js";
 import { detectProject } from "./detect.js";
@@ -7,7 +9,7 @@ import { analyzeDiff } from "./diff.js";
 import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.js";
 import { resolveConfig } from "./generate.js";
 import { afterPushHook, beforeCommitHook, beforePushHook, beforePushRefHook, resolveProtectedBranches, resolveWorkingBranch } from "./hooks.js";
-import { copyHookScripts, initProject, installGitHooks, resetTestmeState } from "./init.js";
+import { copyHookScripts, installGitHooks, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
 
@@ -21,8 +23,38 @@ program
 program
   .command("init")
   .description("Install testme templates, hooks, and skill into the current repo")
-  .action(() => {
-    const created = initProject(process.cwd());
+  .option("--agent <agents>", "comma-separated agents: cursor,claude,windsurf,agents-md,all")
+  .option("--questions <n>", "number of questions per session (1-5)")
+  .option("--difficulty <level>", "easy, medium, or hard")
+  .option("--yes", "skip interactive prompts")
+  .option("--force", "re-run wizard and overwrite config preferences")
+  .action(async (options) => {
+    const { initProject } = await import("./init.js");
+    const { parseAgentList } = await import("./agents/detect.js");
+    const { parseDifficultyOption, parseQuestionsOption } = await import("./setup-wizard.js");
+
+    const initOptions: import("./init.js").InitOptions = {
+      yes: Boolean(options.yes),
+      force: Boolean(options.force),
+    };
+
+    if (options.agent) {
+      initOptions.agents = parseAgentList(options.agent);
+    }
+
+    if (options.questions || options.difficulty) {
+      if (options.force || !existsSync(path.join(process.cwd(), "testme.config.json"))) {
+        initOptions.wizard = {
+          questions: options.questions
+            ? parseQuestionsOption(options.questions)
+            : { min: 2, max: 3 },
+          difficulty: options.difficulty ? parseDifficultyOption(options.difficulty) : "medium",
+        };
+      }
+      initOptions.skipWizard = true;
+    }
+
+    const created = await initProject(process.cwd(), initOptions);
     console.log("testme initialized.");
     for (const item of created) {
       console.log(`  + ${item}`);

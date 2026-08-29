@@ -58,6 +58,33 @@ describe("isQuestionPassing", () => {
       ),
     ).toBe(true);
   });
+
+  it("respects minAlignment for easy difficulty", () => {
+    expect(
+      isQuestionPassing(
+        { passed: true, accuracy: 80, alignment: "low" },
+        60,
+        "low",
+      ),
+    ).toBe(true);
+    expect(
+      isQuestionPassing(
+        { passed: true, accuracy: 80, alignment: "low" },
+        60,
+        "medium",
+      ),
+    ).toBe(false);
+  });
+
+  it("requires high alignment on hard difficulty", () => {
+    expect(
+      isQuestionPassing(
+        { passed: true, accuracy: 90, alignment: "medium" },
+        85,
+        "high",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("passStillValid", () => {

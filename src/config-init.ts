@@ -3,7 +3,6 @@ import path from "node:path";
 import { DEFAULT_CONFIG, loadConfig, mergeConfig, normalizeConfig, stripDetected, writeConfigFile } from "./config.js";
 import { analyzeDiff } from "./diff.js";
 import { applyDetectionToConfig, detectProject } from "./detect.js";
-import { REPO_CONFIG_PATH } from "./paths.js";
 import type { TestmeConfig } from "./types.js";
 
 export function createInitialConfig(cwd: string): TestmeConfig {
@@ -26,6 +25,38 @@ export function initConfig(cwd: string, force = false): { created: boolean; path
   writeConfigFile(configPath, config);
 
   return { created: true, path: configPath, config };
+}
+
+export function initConfigWithWizard(
+  cwd: string,
+  config: TestmeConfig,
+  applyWizard = true,
+): { created: boolean; updated: boolean; path: string; config: TestmeConfig } {
+  const configPath = path.join(cwd, "testme.config.json");
+  const exists = existsSync(configPath);
+
+  if (exists && !applyWizard) {
+    return { created: false, updated: false, path: configPath, config: loadConfig(cwd) };
+  }
+
+  if (exists) {
+    const existing = loadConfig(cwd);
+    const merged = normalizeConfig({
+      ...existing,
+      questions: config.questions,
+      passThreshold: config.passThreshold,
+      minAlignment: config.minAlignment,
+      difficulty: config.difficulty,
+      categories: config.categories,
+      autoDetect: config.autoDetect,
+      gateCommits: config.gateCommits,
+    });
+    writeConfigFile(configPath, merged);
+    return { created: false, updated: true, path: configPath, config: merged };
+  }
+
+  writeConfigFile(configPath, config);
+  return { created: true, updated: false, path: configPath, config };
 }
 
 export function showConfig(cwd: string): TestmeConfig {

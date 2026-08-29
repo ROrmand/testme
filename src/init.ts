@@ -3,21 +3,40 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { installAgentsMd } from "./agents/agents-md.js";
+import { installClaude } from "./agents/claude.js";
+import { installCursor } from "./agents/cursor.js";
+import { ALL_AGENT_IDS, type AgentId } from "./agents/types.js";
+import { installWindsurf } from "./agents/windsurf.js";
+import { detectAgents, parseAgentList } from "./agents/detect.js";
+import { chmodScripts } from "./agents/shared.js";
+import { createInitialConfig, initConfigWithWizard } from "./config-init.js";
+import { ensureTestmeGitignore } from "./gitignore.js";
 import { TEMPLATES_DIR } from "./paths.js";
-import { initConfig } from "./config-init.js";
-
-interface HooksConfig {
-  version: number;
-  hooks: Record<string, Array<Record<string, unknown>>>;
-}
+import {
+  DEFAULT_WIZARD_CHOICES,
+  type WizardChoices,
+  applyWizardToConfig,
+  promptAgentSelection,
+  promptWizardChoices,
+} from "./setup-wizard.js";
+import type { TestmeConfig } from "./types.js";
 
 const GIT_HOOK_MARKER = "testme-managed hook";
+
+export interface InitOptions {
+  agents?: AgentId[];
+  wizard?: WizardChoices;
+  force?: boolean;
+  yes?: boolean;
+  skipWizard?: boolean;
+}
 
 function copyIfMissing(source: string, target: string): boolean {
   if (existsSync(target)) {
@@ -29,60 +48,9 @@ function copyIfMissing(source: string, target: string): boolean {
   return true;
 }
 
-function mergeHooks(existingPath: string, templatePath: string, targetPath: string): void {
-  const template = JSON.parse(readFileSync(templatePath, "utf8")) as HooksConfig;
-
-  if (!existsSync(existingPath)) {
-    mkdirSync(path.dirname(targetPath), { recursive: true });
-    copyFileSync(templatePath, targetPath);
-    return;
-  }
-
-  const existing = JSON.parse(readFileSync(existingPath, "utf8")) as HooksConfig;
-  const merged: HooksConfig = {
-    version: existing.version ?? template.version ?? 1,
-    hooks: { ...existing.hooks },
-  };
-
-  for (const [event, hooks] of Object.entries(template.hooks)) {
-    const current = merged.hooks[event] ?? [];
-    const testmeHooks = hooks.map((hook) => ({
-      ...hook,
-      command: String(hook.command).replace(/^\.cursor\//, ".cursor/"),
-    }));
-
-    const existingCommands = new Set(
-      current.map((hook) => String(hook.command ?? "")),
-    );
-
-    for (const hook of testmeHooks) {
-      if (!existingCommands.has(String(hook.command))) {
-        current.push(hook);
-      }
-    }
-
-    merged.hooks[event] = current;
-  }
-
-  writeFileSync(targetPath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-}
-
-function ensureGitignoreEntry(cwd: string): void {
-  const gitignorePath = path.join(cwd, ".gitignore");
-  const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
-
-  if (content.includes(".testme/")) {
-    return;
-  }
-
-  const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-  const block = `${separator}\n# testme session state\n.testme/\n`;
-  writeFileSync(gitignorePath, content + block, "utf8");
-}
-
 export function copyHookScripts(cwd: string): void {
   const hooksDir = path.join(TEMPLATES_DIR, "hooks");
-  const targetDir = path.join(cwd, ".cursor", "hooks");
+  const targetDir = path.join(cwd, ".testme", "hooks");
   mkdirSync(targetDir, { recursive: true });
 
   for (const file of readdirSync(hooksDir)) {
@@ -113,7 +81,7 @@ function installGitHookFile(
     }
   }
 
-  const scriptPath = `.cursor/hooks/${scriptName}`;
+  const scriptPath = `.testme/hooks/${scriptName}`;
   const content = `#!/bin/sh
 # ${GIT_HOOK_MARKER} — re-run npx testme init to refresh
 exec "$(git rev-parse --show-toplevel)/${scriptPath}" "$@"
@@ -146,55 +114,157 @@ export function installGitHooks(cwd: string): string[] {
   return results;
 }
 
-export function initProject(cwd: string): string[] {
+function installAgent(cwd: string, agent: AgentId, created: string[]): void {
+  switch (agent) {
+    case "cursor":
+      installCursor(cwd, created);
+      break;
+    case "claude":
+      installClaude(cwd, created);
+      break;
+    case "windsurf":
+      installWindsurf(cwd, created);
+      break;
+    case "agents-md":
+      installAgentsMd(cwd, created);
+      break;
+  }
+}
+
+export function initShared(cwd: string, config: TestmeConfig, applyWizard = true): string[] {
   const created: string[] = [];
 
-  const summaryTarget = path.join(cwd, "SUMMARY.md");
-  const promptsTarget = path.join(cwd, "PROMPTS.md");
-
-  if (copyIfMissing(path.join(TEMPLATES_DIR, "SUMMARY.md"), summaryTarget)) {
+  if (copyIfMissing(path.join(TEMPLATES_DIR, "SUMMARY.md"), path.join(cwd, "SUMMARY.md"))) {
     created.push("SUMMARY.md");
   }
 
-  if (copyIfMissing(path.join(TEMPLATES_DIR, "PROMPTS.md"), promptsTarget)) {
+  if (copyIfMissing(path.join(TEMPLATES_DIR, "PROMPTS.md"), path.join(cwd, "PROMPTS.md"))) {
     created.push("PROMPTS.md");
   }
 
-  const configResult = initConfig(cwd);
+  const configResult = initConfigWithWizard(cwd, config, applyWizard);
   if (configResult.created) {
     created.push("testme.config.json");
+  } else if (configResult.updated) {
+    created.push("testme.config.json (updated)");
   }
 
   copyHookScripts(cwd);
-
-  const hooksTarget = path.join(cwd, ".cursor", "hooks.json");
-  mergeHooks(hooksTarget, path.join(TEMPLATES_DIR, "hooks.json"), hooksTarget);
-  created.push(".cursor/hooks.json");
+  chmodScripts(path.join(cwd, ".testme", "hooks"));
+  created.push(".testme/hooks/");
 
   for (const item of installGitHooks(cwd)) {
     created.push(item);
   }
 
-  const skillTarget = path.join(cwd, ".cursor", "skills", "testme", "SKILL.md");
-  if (copyIfMissing(path.join(TEMPLATES_DIR, "SKILL.md"), skillTarget)) {
-    created.push(".cursor/skills/testme/SKILL.md");
+  return created;
+}
+
+export async function resolveInitAgents(
+  cwd: string,
+  options: InitOptions,
+): Promise<AgentId[]> {
+  if (options.agents && options.agents.length > 0) {
+    return options.agents;
   }
 
-  ensureGitignoreEntry(cwd);
-  created.push(".gitignore (.testme/ entry)");
+  const detection = detectAgents(cwd);
 
+  if (!options.yes && detection.ambiguous) {
+    return promptAgentSelection(detection.signals, detection.suggested);
+  }
+
+  if (detection.suggested.length > 0) {
+    return detection.suggested;
+  }
+
+  return ALL_AGENT_IDS;
+}
+
+export async function resolveWizardChoices(
+  cwd: string,
+  options: InitOptions,
+): Promise<WizardChoices | null> {
+  if (options.wizard) {
+    return options.wizard;
+  }
+
+  const configPath = path.join(cwd, "testme.config.json");
+  if (existsSync(configPath) && !options.force) {
+    return null;
+  }
+
+  if (options.yes || options.skipWizard) {
+    return DEFAULT_WIZARD_CHOICES;
+  }
+
+  return promptWizardChoices();
+}
+
+export async function initProject(cwd: string, options: InitOptions = {}): Promise<string[]> {
+  const agents = await resolveInitAgents(cwd, options);
+  const wizard = await resolveWizardChoices(cwd, options);
+
+  let config = createInitialConfig(cwd);
+  if (wizard) {
+    config = applyWizardToConfig(config, wizard);
+  }
+  config.gateCommits = true;
+
+  const created = initShared(cwd, config, wizard !== null);
+
+  for (const agent of agents) {
+    installAgent(cwd, agent, created);
+  }
+
+  created.push(...ensureTestmeGitignore(cwd, agents));
+
+  return created;
+}
+
+export function initProjectSync(cwd: string, options: InitOptions = {}): string[] {
+  const agents =
+    options.agents && options.agents.length > 0
+      ? options.agents
+      : detectAgents(cwd).suggested.length > 0
+        ? detectAgents(cwd).suggested
+        : ALL_AGENT_IDS;
+
+  const wizard = options.wizard ?? DEFAULT_WIZARD_CHOICES;
+  let config = createInitialConfig(cwd);
+  config = applyWizardToConfig(config, wizard);
+  config.gateCommits = true;
+
+  const created = initShared(cwd, config, true);
+
+  for (const agent of agents) {
+    installAgent(cwd, agent, created);
+  }
+
+  created.push(...ensureTestmeGitignore(cwd, agents));
   return created;
 }
 
 export function resetTestmeState(cwd: string, resetPrompts = false): void {
   const testmeDir = path.join(cwd, ".testme");
+  const hooksDir = path.join(testmeDir, "hooks");
+
   if (existsSync(testmeDir)) {
-    rmSync(testmeDir, { recursive: true, force: true });
+    for (const entry of readdirSync(testmeDir)) {
+      if (entry === "hooks") {
+        continue;
+      }
+      rmSync(path.join(testmeDir, entry), { recursive: true, force: true });
+    }
   }
 
   if (resetPrompts) {
     const promptsTemplate = path.join(TEMPLATES_DIR, "PROMPTS.md");
     writeFileSync(path.join(cwd, "PROMPTS.md"), readFileSync(promptsTemplate, "utf8"), "utf8");
+  }
+
+  if (!existsSync(hooksDir)) {
+    copyHookScripts(cwd);
   }
 }
 
@@ -203,3 +273,5 @@ export function resetPromptsAfterPush(cwd: string): void {
   writeFileSync(path.join(cwd, "PROMPTS.md"), readFileSync(promptsTemplate, "utf8"), "utf8");
   resetTestmeState(cwd, false);
 }
+
+export { parseAgentList };

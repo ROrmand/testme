@@ -55,6 +55,10 @@ export const DOMAIN_CATEGORY_KEYS: CategoryKey[] = [
 
 export type GradingMode = "semantic" | "keywords";
 
+export type Difficulty = "easy" | "medium" | "hard";
+
+export type AlignmentLevel = "low" | "medium" | "high";
+
 export interface Rubric {
   requiredTerms: string[];
   minLength: number;
@@ -165,6 +169,8 @@ export interface TestmeConfig {
   domain: string | null;
   grading: GradingMode;
   passThreshold: number;
+  minAlignment?: AlignmentLevel;
+  difficulty?: Difficulty;
   protectedBranches: string[];
   gateCommits: boolean;
   autoProtectCurrentBranch: boolean;
@@ -178,6 +184,8 @@ export interface TestmeConfigInput {
   domain?: string | null;
   grading?: GradingMode;
   passThreshold?: number;
+  minAlignment?: AlignmentLevel;
+  difficulty?: Difficulty;
   protectedBranches?: string[];
   gateCommits?: boolean;
   autoProtectCurrentBranch?: boolean;

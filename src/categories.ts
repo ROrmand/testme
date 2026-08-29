@@ -63,6 +63,9 @@ function questionTypeForCategory(category: CategoryKey): QuestionType {
 function isBoilerplatePath(filePath: string): boolean {
   return (
     filePath.startsWith(".cursor/") ||
+    filePath.startsWith(".claude/") ||
+    filePath.startsWith(".windsurf/") ||
+    filePath === "AGENTS.md" ||
     filePath === ".gitignore" ||
     filePath === "PROMPTS.md" ||
     filePath === "SUMMARY.md" ||
