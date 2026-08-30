@@ -32,10 +32,12 @@ describe("mergeConfig", () => {
     const merged = mergeConfig(DEFAULT_CONFIG, {
       protectedBranches: ["main", "release"],
       gateCommits: true,
+      gateEnabled: false,
     });
 
     expect(merged.protectedBranches).toEqual(["main", "release"]);
     expect(merged.gateCommits).toBe(true);
+    expect(merged.gateEnabled).toBe(false);
     expect(merged.autoProtectCurrentBranch).toBe(true);
   });
 });

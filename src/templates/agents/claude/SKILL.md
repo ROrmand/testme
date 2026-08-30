@@ -5,4 +5,4 @@ description: Generate and verify codebase comprehension tests before committing 
 
 # testme
 
-Use the shared workflow: update PROMPTS.md, run `npx testme generate`, quiz the user in chat, grade semantically, then `npx testme verify` before commit/push.
+Use the shared workflow: update PROMPTS.md, run `npx comp-gate generate`, quiz the user in chat, grade semantically, then `npx comp-gate verify` before commit/push.

@@ -19,6 +19,7 @@ import { chmodScripts } from "./agents/shared.js";
 import { createInitialConfig, initConfigWithWizard } from "./config-init.js";
 import { ensureTestmeGitignore } from "./gitignore.js";
 import { TEMPLATES_DIR } from "./paths.js";
+import { bootstrapSummary } from "./bootstrap-summary.js";
 import {
   DEFAULT_WIZARD_CHOICES,
   type WizardChoices,
@@ -27,12 +28,14 @@ import {
   promptWizardChoices,
 } from "./setup-wizard.js";
 import type { TestmeConfig } from "./types.js";
+import type { SummaryMode } from "./setup-wizard.js";
 
 const GIT_HOOK_MARKER = "testme-managed hook";
 
 export interface InitOptions {
   agents?: AgentId[];
   wizard?: WizardChoices;
+  summaryMode?: SummaryMode;
   force?: boolean;
   yes?: boolean;
   skipWizard?: boolean;
@@ -83,7 +86,7 @@ function installGitHookFile(
 
   const scriptPath = `.testme/hooks/${scriptName}`;
   const content = `#!/bin/sh
-# ${GIT_HOOK_MARKER} — re-run npx testme init to refresh
+# ${GIT_HOOK_MARKER} — re-run npx comp-gate init to refresh
 exec "$(git rev-parse --show-toplevel)/${scriptPath}" "$@"
 `;
 
@@ -131,10 +134,22 @@ function installAgent(cwd: string, agent: AgentId, created: string[]): void {
   }
 }
 
-export function initShared(cwd: string, config: TestmeConfig, applyWizard = true): string[] {
+export function initShared(
+  cwd: string,
+  config: TestmeConfig,
+  applyWizard = true,
+  wizard: WizardChoices = DEFAULT_WIZARD_CHOICES,
+): string[] {
   const created: string[] = [];
+  const summaryPath = path.join(cwd, "SUMMARY.md");
 
-  if (copyIfMissing(path.join(TEMPLATES_DIR, "SUMMARY.md"), path.join(cwd, "SUMMARY.md"))) {
+  if (existsSync(summaryPath)) {
+    created.push("SUMMARY.md (existing, unchanged)");
+  } else if (wizard.summaryMode === "generate") {
+    mkdirSync(path.dirname(summaryPath), { recursive: true });
+    writeFileSync(summaryPath, bootstrapSummary(cwd), "utf8");
+    created.push("SUMMARY.md (generated from project metadata)");
+  } else if (copyIfMissing(path.join(TEMPLATES_DIR, "SUMMARY.md"), summaryPath)) {
     created.push("SUMMARY.md");
   }
 
@@ -198,7 +213,7 @@ export async function resolveWizardChoices(
     return DEFAULT_WIZARD_CHOICES;
   }
 
-  return promptWizardChoices();
+  return promptWizardChoices(cwd);
 }
 
 export async function initProject(cwd: string, options: InitOptions = {}): Promise<string[]> {
@@ -211,13 +226,19 @@ export async function initProject(cwd: string, options: InitOptions = {}): Promi
   }
   config.gateCommits = true;
 
-  const created = initShared(cwd, config, wizard !== null);
+  const wizardChoices: WizardChoices = {
+    ...(wizard ?? DEFAULT_WIZARD_CHOICES),
+    ...(options.summaryMode ? { summaryMode: options.summaryMode } : {}),
+  };
+
+  const created = initShared(cwd, config, wizard !== null, wizardChoices);
 
   for (const agent of agents) {
     installAgent(cwd, agent, created);
   }
 
-  created.push(...ensureTestmeGitignore(cwd, agents));
+  const localOnly = wizard?.localOnly ?? true;
+  created.push(...ensureTestmeGitignore(cwd, agents, localOnly));
 
   return created;
 }
@@ -231,17 +252,22 @@ export function initProjectSync(cwd: string, options: InitOptions = {}): string[
         : ALL_AGENT_IDS;
 
   const wizard = options.wizard ?? DEFAULT_WIZARD_CHOICES;
+  const wizardChoices: WizardChoices = {
+    ...wizard,
+    ...(options.summaryMode ? { summaryMode: options.summaryMode } : {}),
+  };
   let config = createInitialConfig(cwd);
-  config = applyWizardToConfig(config, wizard);
+  config = applyWizardToConfig(config, wizardChoices);
   config.gateCommits = true;
 
-  const created = initShared(cwd, config, true);
+  const created = initShared(cwd, config, true, wizardChoices);
 
   for (const agent of agents) {
     installAgent(cwd, agent, created);
   }
 
-  created.push(...ensureTestmeGitignore(cwd, agents));
+  const localOnly = wizardChoices.localOnly;
+  created.push(...ensureTestmeGitignore(cwd, agents, localOnly));
   return created;
 }
 

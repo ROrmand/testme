@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # testme
 
+> **Gate off?** Run `npx comp-gate testing status`. If the gate is disabled, do not run this workflow — tell the user to run `/testing` to re-enable.
+
 Gate `git commit` (when `gateCommits` is enabled) and `git push` to protected branches behind a comprehension check. The agent generates reference answers, quizzes you in chat, then grades your replies by **conceptual alignment** — not keyword matching.
 
 ## When to use
@@ -21,10 +23,10 @@ Gate `git commit` (when `gateCommits` is enabled) and `git push` to protected br
 ```
 Task Progress:
 - [ ] Step 1: Update PROMPTS.md with session changes
-- [ ] Step 2: Run npx testme generate
+- [ ] Step 2: Run npx comp-gate generate
 - [ ] Step 3: Read referenced files; write .testme/references.json
 - [ ] Step 4: Ask each question in chat; collect answers from user replies
-- [ ] Step 5: Grade semantically; write .testme/judgments.json; run npx testme verify
+- [ ] Step 5: Grade semantically; write .testme/judgments.json; run npx comp-gate verify
 - [ ] Step 6: Commit and push only after PASS
 ```
 
@@ -44,7 +46,7 @@ Write bullets as you work. If empty, update from `git diff --stat` first.
 ### Step 2: Generate questions
 
 ```bash
-npx testme generate
+npx comp-gate generate
 ```
 
 Reads `SUMMARY.md`, `PROMPTS.md`, and git diff. Writes `.testme/session.json`.
@@ -126,7 +128,7 @@ Share grading feedback in chat for each question:
 Then run:
 
 ```bash
-npx testme verify
+npx comp-gate verify
 ```
 
 **On PASS:** commit and push to protected branches are allowed.
@@ -157,7 +159,7 @@ In `testme.config.json`:
 - `gateCommits: true` blocks `git commit` until `/testme` passes
 - `autoProtectCurrentBranch: true` (default) also protects your current branch — no config edits when switching branches
 - Pushes to protected branches are blocked with: `You must run the /testme skill before pushing to '<branch>'.`
-- `npx testme init` also installs **git** `pre-commit` / `pre-push` hooks (blocks the Cursor terminal and any other terminal)
+- `npx comp-gate init` also installs **git** `pre-commit` / `pre-push` hooks (blocks the Cursor terminal and any other terminal)
 
 ## Token efficiency rules
 
@@ -218,15 +220,15 @@ Set booleans in `categories` — `true` enables, `false` disables:
 Run detection before editing config:
 
 ```bash
-npx testme detect
-npx testme config init
-npx testme config show
+npx comp-gate detect
+npx comp-gate config init
+npx comp-gate config show
 ```
 
 ### One-off overrides
 
 ```bash
-npx testme generate --max-questions 3 --category changeRationale,runtime,testing
+npx comp-gate generate --max-questions 3 --category changeRationale,runtime,testing
 ```
 
 ### Examples
@@ -241,11 +243,11 @@ Ask the user which categories matter if unclear, then update `testme.config.json
 
 | Issue | Fix |
 |-------|-----|
-| Session stale | Re-run `npx testme generate` |
+| Session stale | Re-run `npx comp-gate generate` |
 | Missing terms | Add clearer bullets to `PROMPTS.md` |
 | Commit blocked | `gateCommits` is on — run `/testme` before committing |
-| Push blocked | Run `/testme` or `npx testme generate` → answer → `verify` |
-| Pass invalid | `npx testme status` — verify then commit/push |
-| Reset session | `npx testme reset` |
+| Push blocked | Run `/testme` or `npx comp-gate generate` → answer → `verify` |
+| Pass invalid | `npx comp-gate status` — verify then commit/push |
+| Reset session | `npx comp-gate reset` |
 | Verify failed | Re-ask failed questions; re-grade and update judgments.json |
 | Missing judgments | Agent must grade semantically before running verify |

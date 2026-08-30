@@ -53,23 +53,41 @@ export function readJson<T>(filePath: string): T | null {
 }
 
 export function copySkill(agent: string, cwd: string, created: string[]): void {
-  const source = path.join(agentTemplatesDir(agent), "SKILL.md");
-  const fallback = path.join(TEMPLATES_DIR, "SKILL.md");
-  const skillSource = existsSync(source) ? source : fallback;
+  const testmeSource = path.join(agentTemplatesDir(agent), "SKILL.md");
+  const testmeFallback = path.join(TEMPLATES_DIR, "SKILL.md");
+  const testmeSkillSource = existsSync(testmeSource) ? testmeSource : testmeFallback;
 
-  const targetDirs: Record<string, string> = {
-    cursor: path.join(cwd, ".cursor", "skills", "testme", "SKILL.md"),
-    claude: path.join(cwd, ".claude", "skills", "testme", "SKILL.md"),
-    windsurf: path.join(cwd, ".windsurf", "skills", "testme", "SKILL.md"),
+  const testingSource = path.join(agentTemplatesDir(agent), "testing-SKILL.md");
+  const testingFallback = path.join(TEMPLATES_DIR, "testing-SKILL.md");
+  const testingSkillSource = existsSync(testingSource) ? testingSource : testingFallback;
+
+  const skillTargets: Record<string, Record<string, string>> = {
+    cursor: {
+      testme: path.join(cwd, ".cursor", "skills", "testme", "SKILL.md"),
+      testing: path.join(cwd, ".cursor", "skills", "testing", "SKILL.md"),
+    },
+    claude: {
+      testme: path.join(cwd, ".claude", "skills", "testme", "SKILL.md"),
+      testing: path.join(cwd, ".claude", "skills", "testing", "SKILL.md"),
+    },
+    windsurf: {
+      testme: path.join(cwd, ".windsurf", "skills", "testme", "SKILL.md"),
+      testing: path.join(cwd, ".windsurf", "skills", "testing", "SKILL.md"),
+    },
   };
 
-  const target = targetDirs[agent];
-  if (!target) {
+  const targets = skillTargets[agent];
+  if (!targets) {
     return;
   }
 
-  copyAlways(skillSource, target);
-  created.push(target.replace(`${cwd}/`, ""));
+  copyAlways(testmeSkillSource, targets.testme);
+  created.push(targets.testme.replace(`${cwd}/`, ""));
+
+  if (existsSync(testingSkillSource)) {
+    copyAlways(testingSkillSource, targets.testing);
+    created.push(targets.testing.replace(`${cwd}/`, ""));
+  }
 }
 
 export function chmodScripts(dir: string): void {

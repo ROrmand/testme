@@ -6,4 +6,4 @@ disable-model-invocation: true
 
 # testme
 
-Use the shared workflow in the project `SKILL.md` template. Run `npx testme generate`, quiz the user in chat, grade semantically, then `npx testme verify` before commit/push.
+Use the shared workflow in the project `SKILL.md` template. Run `npx comp-gate generate`, quiz the user in chat, grade semantically, then `npx comp-gate verify` before commit/push.

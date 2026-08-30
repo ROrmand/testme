@@ -13,5 +13,5 @@ if ! echo "$command" | grep -qE '^git[[:space:]]+push'; then
   exit 0
 fi
 
-npx --yes testme hook after-push --command "$command" 2>/dev/null || true
+npx --yes comp-gate hook after-push --command "$command" 2>/dev/null || true
 exit 0

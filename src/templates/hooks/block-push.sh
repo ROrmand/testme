@@ -9,7 +9,7 @@ if ! echo "$command" | grep -qE '^git[[:space:]]+push'; then
   exit 0
 fi
 
-response=$(npx --yes testme hook before-push --command "$command" --json 2>/dev/null || true)
+response=$(npx --yes comp-gate hook before-push --command "$command" --json 2>/dev/null || true)
 
 if [ -n "$response" ]; then
   echo "$response"

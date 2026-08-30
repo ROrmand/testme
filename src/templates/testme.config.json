@@ -27,5 +27,6 @@
   "passThreshold": 70,
   "protectedBranches": ["main"],
   "gateCommits": true,
+  "gateEnabled": true,
   "autoProtectCurrentBranch": true
 }

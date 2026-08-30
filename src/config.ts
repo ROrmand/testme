@@ -39,6 +39,7 @@ export const DEFAULT_CONFIG: TestmeConfig = {
   minAlignment: "medium",
   protectedBranches: ["main"],
   gateCommits: false,
+  gateEnabled: true,
   autoProtectCurrentBranch: true,
 };
 
@@ -87,6 +88,7 @@ export function mergeConfig(
     difficulty: patch.difficulty ?? base.difficulty,
     protectedBranches: patch.protectedBranches ?? base.protectedBranches,
     gateCommits: patch.gateCommits ?? base.gateCommits,
+    gateEnabled: patch.gateEnabled ?? base.gateEnabled,
     autoProtectCurrentBranch:
       patch.autoProtectCurrentBranch ?? base.autoProtectCurrentBranch,
     _detected: patch._detected ?? base._detected,
@@ -150,4 +152,15 @@ export function enabledCategories(config: TestmeConfig): CategoryKey[] {
 export function writeConfigFile(filePath: string, config: TestmeConfig): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(stripDetected(config), null, 2)}\n`, "utf8");
+}
+
+export function patchLocalConfig(
+  cwd: string,
+  patch: TestmeConfigInput,
+): void {
+  const localPath = path.join(cwd, ".testme", "config.json");
+  const existing = readJsonFile(localPath) ?? {};
+  const merged = { ...existing, ...patch };
+  mkdirSync(path.dirname(localPath), { recursive: true });
+  writeFileSync(localPath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
 }

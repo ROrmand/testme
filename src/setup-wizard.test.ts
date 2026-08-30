@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   applyWizardToConfig,
+  DEFAULT_WIZARD_CHOICES,
   minAlignmentForDifficulty,
   parseDifficultyOption,
+  parseLocalOnlyOption,
   parseQuestionsOption,
+  parseSummaryModeOption,
   questionsFromCount,
+  terminalLink,
 } from "./setup-wizard.js";
 import { DEFAULT_CONFIG } from "./config.js";
 
@@ -28,6 +32,8 @@ describe("setup wizard mapping", () => {
     const config = applyWizardToConfig(DEFAULT_CONFIG, {
       questions: { min: 2, max: 2 },
       difficulty: "easy",
+      localOnly: true,
+      summaryMode: "blank",
     });
 
     expect(config.passThreshold).toBe(60);
@@ -40,6 +46,8 @@ describe("setup wizard mapping", () => {
     const config = applyWizardToConfig(DEFAULT_CONFIG, {
       questions: { min: 3, max: 5 },
       difficulty: "hard",
+      localOnly: true,
+      summaryMode: "blank",
     });
 
     expect(config.passThreshold).toBe(85);
@@ -51,5 +59,27 @@ describe("setup wizard mapping", () => {
   it("parses difficulty option", () => {
     expect(parseDifficultyOption("medium")).toBe("medium");
     expect(() => parseDifficultyOption("extreme")).toThrow();
+  });
+
+  it("parses local-only option", () => {
+    expect(parseLocalOnlyOption("true")).toBe(true);
+    expect(parseLocalOnlyOption("no")).toBe(false);
+    expect(() => parseLocalOnlyOption("maybe")).toThrow();
+  });
+
+  it("parses summary mode option", () => {
+    expect(parseSummaryModeOption("blank")).toBe("blank");
+    expect(parseSummaryModeOption("generate")).toBe("generate");
+    expect(() => parseSummaryModeOption("auto")).toThrow();
+  });
+
+  it("defaults summary mode to blank", () => {
+    expect(DEFAULT_WIZARD_CHOICES.summaryMode).toBe("blank");
+  });
+
+  it("formats terminal hyperlinks", () => {
+    const link = terminalLink("https://example.com", "docs");
+    expect(link).toContain("https://example.com");
+    expect(link).toContain("docs");
   });
 });

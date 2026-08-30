@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   beforeCommitHook,
   beforePushHook,
@@ -11,6 +14,36 @@ import {
   pushBlockedMessage,
   resolveProtectedBranches,
 } from "./hooks.js";
+
+let isolatedCwd: string;
+
+afterEach(() => {
+  if (isolatedCwd) {
+    rmSync(isolatedCwd, { recursive: true, force: true });
+    isolatedCwd = "";
+  }
+});
+
+function emptyProjectDir(): string {
+  isolatedCwd = mkdtempSync(path.join(tmpdir(), "testme-hooks-"));
+  return isolatedCwd;
+}
+
+function projectWithGateDisabled(): string {
+  const cwd = emptyProjectDir();
+  mkdirSync(path.join(cwd, ".testme"), { recursive: true });
+  writeFileSync(
+    path.join(cwd, "testme.config.json"),
+    JSON.stringify({ gateCommits: true, protectedBranches: ["main"] }),
+    "utf8",
+  );
+  writeFileSync(
+    path.join(cwd, ".testme", "config.json"),
+    JSON.stringify({ gateEnabled: false }),
+    "utf8",
+  );
+  return cwd;
+}
 
 describe("parsePushBranch", () => {
   it("extracts branch from explicit push commands", () => {
@@ -72,9 +105,14 @@ describe("parseRemoteRef", () => {
 
 describe("beforePushRefHook", () => {
   it("denies protected branch refs without a valid pass", () => {
-    const result = beforePushRefHook("/tmp", "refs/heads/main");
+    const result = beforePushRefHook(emptyProjectDir(), "refs/heads/main");
     expect(result.permission).toBe("deny");
     expect(result.user_message).toBe(pushBlockedMessage("main"));
+  });
+
+  it("allows protected branch refs when gate is disabled", () => {
+    const result = beforePushRefHook(projectWithGateDisabled(), "refs/heads/main");
+    expect(result.permission).toBe("allow");
   });
 });
 
@@ -93,20 +131,30 @@ describe("resolveProtectedBranches", () => {
 
 describe("beforePushHook", () => {
   it("allows non-protected branch pushes", () => {
-    const result = beforePushHook("/tmp", "git push origin feature");
+    const result = beforePushHook(emptyProjectDir(), "git push origin feature");
     expect(result.permission).toBe("allow");
   });
 
   it("denies protected branch pushes without a valid pass", () => {
-    const result = beforePushHook("/tmp", "git push origin main");
+    const result = beforePushHook(emptyProjectDir(), "git push origin main");
     expect(result.permission).toBe("deny");
     expect(result.user_message).toBe(pushBlockedMessage("main"));
+  });
+
+  it("allows protected branch pushes when gate is disabled", () => {
+    const result = beforePushHook(projectWithGateDisabled(), "git push origin main");
+    expect(result.permission).toBe("allow");
   });
 });
 
 describe("beforeCommitHook", () => {
   it("allows commits when gateCommits is disabled", () => {
-    const result = beforeCommitHook("/tmp", "git commit -m test");
+    const result = beforeCommitHook(emptyProjectDir(), "git commit -m test");
+    expect(result.permission).toBe("allow");
+  });
+
+  it("allows commits when gate is disabled", () => {
+    const result = beforeCommitHook(projectWithGateDisabled(), "git commit -m test");
     expect(result.permission).toBe("allow");
   });
 });

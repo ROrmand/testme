@@ -1,9 +1,10 @@
 {
-  "name": "testme",
+  "name": "comp-gate",
   "version": "0.1.0",
   "description": "Comprehension gate for desktop coding agents — block git push to main until you pass a deterministic test",
   "type": "module",
   "bin": {
+    "comp-gate": "./dist/cli.js",
     "testme": "./dist/cli.js"
   },
   "files": [
@@ -14,14 +15,27 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "node --experimental-vm-modules node_modules/vitest/vitest.mjs run",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ROrmand/comp-gate.git"
+  },
+  "homepage": "https://github.com/ROrmand/comp-gate#readme",
+  "bugs": {
+    "url": "https://github.com/ROrmand/comp-gate/issues"
   },
   "keywords": [
     "cursor",
+    "claude",
+    "windsurf",
     "agent",
     "git",
     "comprehension",
-    "hooks"
+    "hooks",
+    "pre-push",
+    "pre-commit"
   ],
   "license": "MIT",
   "engines": {

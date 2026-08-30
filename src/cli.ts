@@ -12,12 +12,19 @@ import { afterPushHook, beforeCommitHook, beforePushHook, beforePushRefHook, res
 import { copyHookScripts, installGitHooks, resetTestmeState } from "./init.js";
 import { promptsHasContent } from "./prompts.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
+import {
+  formatGateBanner,
+  formatStatusline,
+  isGateEnabled,
+  setGateEnabled,
+  toggleGateEnabled,
+} from "./testing.js";
 
 const program = new Command();
 
 program
-  .name("testme")
-  .description("Comprehension gate for desktop coding agents")
+  .name("comp-gate")
+  .description("Comprehension gate for desktop coding agents (testme workflow)")
   .option("-b, --branch <name>", "override working branch for diff and pass validation");
 
 program
@@ -26,12 +33,16 @@ program
   .option("--agent <agents>", "comma-separated agents: cursor,claude,windsurf,agents-md,all")
   .option("--questions <n>", "number of questions per session (1-5)")
   .option("--difficulty <level>", "easy, medium, or hard")
+  .option("--local-only <bool>", "gitignore agent skills (true/false); default true")
+  .option("--summary <mode>", "SUMMARY.md setup: blank (default) or generate")
   .option("--yes", "skip interactive prompts")
   .option("--force", "re-run wizard and overwrite config preferences")
   .action(async (options) => {
     const { initProject } = await import("./init.js");
     const { parseAgentList } = await import("./agents/detect.js");
-    const { parseDifficultyOption, parseQuestionsOption } = await import("./setup-wizard.js");
+    const { parseDifficultyOption, parseLocalOnlyOption, parseQuestionsOption, parseSummaryModeOption } = await import(
+      "./setup-wizard.js"
+    );
 
     const initOptions: import("./init.js").InitOptions = {
       yes: Boolean(options.yes),
@@ -42,20 +53,32 @@ program
       initOptions.agents = parseAgentList(options.agent);
     }
 
-    if (options.questions || options.difficulty) {
+    if (
+      options.questions ||
+      options.difficulty ||
+      options.localOnly !== undefined ||
+      options.summary
+    ) {
       if (options.force || !existsSync(path.join(process.cwd(), "testme.config.json"))) {
         initOptions.wizard = {
           questions: options.questions
             ? parseQuestionsOption(options.questions)
             : { min: 2, max: 3 },
           difficulty: options.difficulty ? parseDifficultyOption(options.difficulty) : "medium",
+          localOnly:
+            options.localOnly !== undefined ? parseLocalOnlyOption(options.localOnly) : true,
+          summaryMode: options.summary ? parseSummaryModeOption(options.summary) : "blank",
         };
       }
       initOptions.skipWizard = true;
     }
 
+    if (options.summary) {
+      initOptions.summaryMode = parseSummaryModeOption(options.summary);
+    }
+
     const created = await initProject(process.cwd(), initOptions);
-    console.log("testme initialized.");
+    console.log("comp-gate initialized.");
     for (const item of created) {
       console.log(`  + ${item}`);
     }
@@ -209,6 +232,7 @@ program
       `Protected branches: ${resolveProtectedBranches(cwd, cliBranch).join(", ")}`,
     );
     console.log(`Pass valid: ${valid ? "yes" : "no"}`);
+    console.log(`Gate enabled: ${isGateEnabled(cwd) ? "yes" : "no"}`);
 
     if (pass) {
       console.log(`Last verified: ${pass.verifiedAt}`);
@@ -227,6 +251,71 @@ program
     if (!promptsHasContent()) {
       console.log("PROMPTS.md is empty — document changes before generate.");
     }
+  });
+
+const testingCmd = program
+  .command("testing")
+  .description("Toggle the testme comprehension gate on or off (local per developer)");
+
+testingCmd
+  .command("status")
+  .description("Show whether the gate is enabled")
+  .action(() => {
+    const cwd = process.cwd();
+    const enabled = isGateEnabled(cwd);
+    console.log(formatGateBanner(enabled));
+    console.log(`gateEnabled: ${enabled}`);
+  });
+
+testingCmd
+  .command("on")
+  .description("Enable the comprehension gate")
+  .action(() => {
+    const cwd = process.cwd();
+    setGateEnabled(cwd, true);
+    console.log(formatGateBanner(true));
+    console.log("gateEnabled: true");
+  });
+
+testingCmd
+  .command("off")
+  .description("Disable the comprehension gate")
+  .action(() => {
+    const cwd = process.cwd();
+    setGateEnabled(cwd, false);
+    console.log(formatGateBanner(false));
+    console.log("gateEnabled: false");
+    console.warn("Warning: commit and push will no longer require /testme until re-enabled.");
+  });
+
+testingCmd
+  .command("toggle")
+  .description("Flip the gate on or off")
+  .action(() => {
+    const cwd = process.cwd();
+    const enabled = toggleGateEnabled(cwd);
+    console.log(formatGateBanner(enabled));
+    console.log(`gateEnabled: ${enabled}`);
+    if (!enabled) {
+      console.warn("Warning: commit and push will no longer require /testme until re-enabled.");
+    }
+  });
+
+testingCmd.action(() => {
+  const cwd = process.cwd();
+  const enabled = toggleGateEnabled(cwd);
+  console.log(formatGateBanner(enabled));
+  console.log(`gateEnabled: ${enabled}`);
+  if (!enabled) {
+    console.warn("Warning: commit and push will no longer require /testme until re-enabled.");
+  }
+});
+
+program
+  .command("statusline")
+  .description("One-line gate status for Cursor status line integration")
+  .action(() => {
+    console.log(formatStatusline(isGateEnabled(process.cwd())));
   });
 
 program

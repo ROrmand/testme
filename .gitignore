@@ -3,6 +3,6 @@ dist/
 .testme/
 *.tsbuildinfo
 
-# testme local setup — run npx testme init (do not commit)
+# testme local setup — run npx comp-gate init (do not commit)
 .testme/
 .cursor/skills/testme/

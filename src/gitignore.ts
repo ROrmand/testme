@@ -4,11 +4,11 @@ import type { AgentId } from "./agents/types.js";
 
 export const GITIGNORE_MARKER = "# testme local setup";
 
-const SKILL_PATHS: Record<AgentId, string> = {
-  cursor: ".cursor/skills/testme/",
-  claude: ".claude/skills/testme/",
-  windsurf: ".windsurf/skills/testme/",
-  "agents-md": "",
+const AGENT_SKILL_DIRS: Record<string, string[]> = {
+  cursor: [".cursor/skills/testme/", ".cursor/skills/testing/"],
+  claude: [".claude/skills/testme/", ".claude/skills/testing/"],
+  windsurf: [".windsurf/skills/testme/", ".windsurf/skills/testing/"],
+  "agents-md": [],
 };
 
 const HOOK_CONFIG_PATHS: Record<Exclude<AgentId, "agents-md">, string> = {
@@ -78,31 +78,33 @@ export interface GitignorePlan {
 export function buildGitignorePlan(
   cwd: string,
   agents: AgentId[],
+  localOnly = true,
 ): GitignorePlan {
   const lines = [".testme/"];
   const warnings: string[] = [];
   let gitignoreHookConfigs = true;
 
-  for (const agent of agents) {
-    const skillPath = SKILL_PATHS[agent];
-    if (skillPath) {
-      lines.push(skillPath);
-    }
-  }
-
-  for (const agent of agents) {
-    if (agent === "agents-md") {
-      continue;
+  if (localOnly) {
+    for (const agent of agents) {
+      for (const skillPath of AGENT_SKILL_DIRS[agent] ?? []) {
+        lines.push(skillPath);
+      }
     }
 
-    const hookPath = path.join(cwd, HOOK_CONFIG_PATHS[agent]);
-    if (hookConfigHasNonTestmeContent(hookPath)) {
-      gitignoreHookConfigs = false;
-      warnings.push(
-        `${HOOK_CONFIG_PATHS[agent]} contains non-testme hooks — add testme entries manually or keep them local.`,
-      );
-    } else {
-      lines.push(HOOK_CONFIG_PATHS[agent]);
+    for (const agent of agents) {
+      if (agent === "agents-md") {
+        continue;
+      }
+
+      const hookPath = path.join(cwd, HOOK_CONFIG_PATHS[agent]);
+      if (hookConfigHasNonTestmeContent(hookPath)) {
+        gitignoreHookConfigs = false;
+        warnings.push(
+          `${HOOK_CONFIG_PATHS[agent]} contains non-testme hooks — add testme entries manually or keep them local.`,
+        );
+      } else {
+        lines.push(HOOK_CONFIG_PATHS[agent]);
+      }
     }
   }
 
@@ -113,7 +115,11 @@ export function buildGitignorePlan(
   return { lines, gitignoreHookConfigs: true, warnings };
 }
 
-export function ensureTestmeGitignore(cwd: string, agents: AgentId[]): string[] {
+export function ensureTestmeGitignore(
+  cwd: string,
+  agents: AgentId[],
+  localOnly = true,
+): string[] {
   const gitignorePath = path.join(cwd, ".gitignore");
   const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
 
@@ -121,9 +127,9 @@ export function ensureTestmeGitignore(cwd: string, agents: AgentId[]): string[] 
     return [];
   }
 
-  const plan = buildGitignorePlan(cwd, agents);
+  const plan = buildGitignorePlan(cwd, agents, localOnly);
   const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-  const block = `${separator}\n${GITIGNORE_MARKER} — run npx testme init (do not commit)\n${plan.lines.join("\n")}\n`;
+  const block = `${separator}\n${GITIGNORE_MARKER} — run npx comp-gate init (do not commit)\n${plan.lines.join("\n")}\n`;
 
   writeFileSync(gitignorePath, content + block, "utf8");
 

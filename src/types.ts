@@ -173,6 +173,7 @@ export interface TestmeConfig {
   difficulty?: Difficulty;
   protectedBranches: string[];
   gateCommits: boolean;
+  gateEnabled: boolean;
   autoProtectCurrentBranch: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }
@@ -188,6 +189,7 @@ export interface TestmeConfigInput {
   difficulty?: Difficulty;
   protectedBranches?: string[];
   gateCommits?: boolean;
+  gateEnabled?: boolean;
   autoProtectCurrentBranch?: boolean;
   _detected?: Record<string, { confidence: number; reason: string }>;
 }

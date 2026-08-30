@@ -166,6 +166,10 @@ export function beforeCommitHook(
   }
 
   const config = loadConfig(cwd);
+  if (config.gateEnabled === false) {
+    return { permission: "allow" };
+  }
+
   if (!config.gateCommits) {
     return { permission: "allow" };
   }
@@ -193,6 +197,11 @@ function evaluateProtectedPush(
   targetBranch: string,
   cliBranch?: string,
 ): HookResult {
+  const config = loadConfig(cwd);
+  if (config.gateEnabled === false) {
+    return { permission: "allow" };
+  }
+
   const protectedBranches = resolveProtectedBranches(cwd, cliBranch);
 
   if (!protectedBranches.includes(targetBranch)) {

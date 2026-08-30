@@ -23,7 +23,7 @@ else
   exit 0
 fi
 
-response=$(npx --yes testme hook "$hook_kind" --command "$command" --json 2>/dev/null || true)
+response=$(npx --yes comp-gate hook "$hook_kind" --command "$command" --json 2>/dev/null || true)
 
 if [ -n "$response" ] && echo "$response" | grep -q '"permission"[[:space:]]*:[[:space:]]*"deny"'; then
   message=$(echo "$response" | node -e '

@@ -4,13 +4,19 @@ import type { TestmeConfig } from "./types.js";
 import { ALL_CATEGORY_KEYS } from "./types.js";
 import { AGENT_LABELS, type AgentId } from "./agents/types.js";
 import type { AgentSignal } from "./agents/types.js";
+import { ADOPTING_EXISTING_REPOS_URL } from "./constants.js";
+import { measureRepo } from "./repo-stats.js";
 
 export type Difficulty = "easy" | "medium" | "hard";
 export type AlignmentLevel = "low" | "medium" | "high";
+export type SummaryMode = "blank" | "generate";
 
 export interface WizardChoices {
   questions: { min: number; max: number };
   difficulty: Difficulty;
+  /** When true, agent skills and hook configs are added to .gitignore (local-only setup). */
+  localOnly: boolean;
+  summaryMode: SummaryMode;
 }
 
 export function questionsFromCount(count: number): { min: number; max: number } {
@@ -84,7 +90,32 @@ export function applyWizardToConfig(config: TestmeConfig, wizard: WizardChoices)
 export const DEFAULT_WIZARD_CHOICES: WizardChoices = {
   questions: { min: 2, max: 3 },
   difficulty: "medium",
+  localOnly: true,
+  summaryMode: "blank",
 };
+
+export function terminalLink(url: string, label: string): string {
+  return `\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`;
+}
+
+export function parseSummaryModeOption(value: string): SummaryMode {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "blank" || normalized === "generate") {
+    return normalized;
+  }
+  throw new Error("Summary mode must be blank or generate.");
+}
+
+export function parseLocalOnlyOption(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "yes" || normalized === "1") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "no" || normalized === "0") {
+    return false;
+  }
+  throw new Error("Local-only must be true/false or yes/no.");
+}
 
 async function ask(rl: readline.Interface, question: string): Promise<string> {
   const answer = await rl.question(question);
@@ -137,7 +168,7 @@ export async function promptAgentSelection(
   }
 }
 
-export async function promptWizardChoices(): Promise<WizardChoices> {
+export async function promptWizardChoices(cwd = process.cwd()): Promise<WizardChoices> {
   const rl = readline.createInterface({ input, output });
   try {
     console.log("\nHow many questions per session?");
@@ -191,7 +222,75 @@ export async function promptWizardChoices(): Promise<WizardChoices> {
         difficulty = parseDifficultyOption(diffRaw);
     }
 
-    return { questions, difficulty };
+    console.log("\nKeep agent skills local-only (add to .gitignore)?");
+    console.log("  1. Yes  (default — each developer runs init after clone)");
+    console.log("  2. No   (commit skills to the repo for the whole team)");
+
+    const localRaw = await ask(rl, "> ");
+    let localOnly: boolean;
+    switch (localRaw) {
+      case "2":
+        localOnly = false;
+        break;
+      case "1":
+      case "":
+        localOnly = true;
+        break;
+      default:
+        localOnly = parseLocalOnlyOption(localRaw);
+    }
+
+    const stats = measureRepo(cwd);
+    const largeLabel = stats.isLarge ? " (large)" : "";
+
+    console.log("\nSUMMARY.md setup");
+    console.log(`\nThis repository has ~${stats.trackedFiles.toLocaleString()} tracked files${largeLabel}.`);
+    console.log("\n  Blank: install an empty template. You fill SUMMARY.md once with");
+    if (stats.isLarge) {
+      console.log("         high-level architecture (recommended for large repos).");
+    } else {
+      console.log("         high-level architecture.");
+    }
+    console.log("\n  Generate: draft SUMMARY.md from README, package.json/pyproject.toml,");
+    console.log("            and top-level folders only — not a full codebase summary.");
+
+    if (stats.isLarge) {
+      console.log("\n  On large repos, auto-generated summaries are often shallow, stale quickly,");
+      console.log("  and cannot replace a hand-written project map.");
+    }
+
+    console.log(`\n  Learn more: ${terminalLink(ADOPTING_EXISTING_REPOS_URL, "adopting existing repos")}`);
+    console.log(`  ${ADOPTING_EXISTING_REPOS_URL}`);
+
+    const blankLabel = stats.isLarge
+      ? "1. Start blank (recommended for large repos)"
+      : "1. Start blank (recommended)";
+    console.log(`\n  ${blankLabel}`);
+    console.log("  2. Generate SUMMARY.md from project metadata");
+
+    const summaryRaw = await ask(rl, "> ");
+    let summaryMode: SummaryMode;
+
+    switch (summaryRaw) {
+      case "2":
+        summaryMode = "generate";
+        break;
+      case "1":
+      case "":
+        summaryMode = "blank";
+        break;
+      default:
+        summaryMode = parseSummaryModeOption(summaryRaw);
+    }
+
+    if (stats.isLarge && summaryMode === "generate") {
+      const confirm = await ask(rl, 'Type "generate" to continue: ');
+      if (confirm !== "generate") {
+        summaryMode = "blank";
+      }
+    }
+
+    return { questions, difficulty, localOnly, summaryMode };
   } finally {
     rl.close();
   }

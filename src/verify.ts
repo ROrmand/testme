@@ -214,7 +214,7 @@ export function verifyAnswersSemantic(
 
 export function loadSession(): Session {
   if (!existsSync(SESSION_PATH)) {
-    throw new Error("No session found. Run `npx testme generate` first.");
+    throw new Error("No session found. Run `npx comp-gate generate` first.");
   }
 
   return JSON.parse(readFileSync(SESSION_PATH, "utf8")) as Session;
@@ -264,7 +264,7 @@ export function verifySession(cwd: string, branch = "main"): VerifyResult {
 
   if (session.diffHash !== current.diffHash) {
     throw new Error(
-      "Session is stale. The diff changed since generate — run `npx testme generate` again.",
+      "Session is stale. The diff changed since generate — run `npx comp-gate generate` again.",
     );
   }
 

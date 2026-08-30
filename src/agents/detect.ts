@@ -22,7 +22,12 @@ function agentsMdMentionsTestme(cwd: string): boolean {
     return false;
   }
   const content = readFileSync(agentsPath, "utf8").toLowerCase();
-  return content.includes("testme") || content.includes("npx testme");
+  return (
+    content.includes("testme") ||
+    content.includes("comp-gate") ||
+    content.includes("npx testme") ||
+    content.includes("npx comp-gate")
+  );
 }
 
 export function detectAgents(cwd: string, env: NodeJS.ProcessEnv = process.env): AgentDetectionResult {
