@@ -1,10 +1,63 @@
-# testme
+# comp-gate
 
 Comprehension gate for desktop coding agents. Blocks `git commit` (when enabled) and `git push` to protected branches until you pass a comprehension test.
 
-Published on npm as [`comp-gate`](https://www.npmjs.com/package/comp-gate). CLI: `npx comp-gate` (alias: `testme`).
+Published on npm as [`comp-gate`](https://www.npmjs.com/package/comp-gate). Install and run with `npx comp-gate`.
 
-## Quick start
+## Table of contents
+
+- [Description](#description)
+- [Skills](#skills)
+- [Quick setup](#quick-setup)
+  - [What gets installed](#what-gets-installed)
+- [Using with your agent](#using-with-your-agent)
+  - [Cursor](#cursor)
+  - [Claude Code](#claude-code)
+  - [Windsurf](#windsurf)
+  - [AGENTS.md](#agentsmd)
+- [Toggle gating with `/testing`](#toggle-gating-with-testing)
+- [Daily workflow](#daily-workflow)
+- [Commands](#commands)
+- [Configuration](#configuration)
+- [Adopting an existing repository](#adopting-an-existing-repository)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Contributing](#contributing)
+
+## Description
+
+comp-gate sits between your coding agent and `git commit` / `git push`. Before changes land on a protected branch, you answer comprehension questions about what you changed. The agent grades answers by conceptual alignment — not keyword matching — so the gate checks understanding, not memorization.
+
+**How it works:**
+
+- You document session changes in `testme/PROMPTS.md` as you work.
+- `npx comp-gate generate` builds questions from your git diff, `testme/SUMMARY.md`, and `testme/PROMPTS.md`.
+- You answer questions in chat via the `/testme` skill.
+- `npx comp-gate verify` scores your answers; on PASS, commit and push are allowed.
+- After a successful push, `testme/PROMPTS.md` resets automatically.
+
+Git hooks and agent integrations block operations until you pass. Gate state is per-developer (`.testme/`), so one person can pause gating locally without affecting team config.
+
+## Skills
+
+After `init`, two agent skills are available in chat:
+
+| Skill | Purpose |
+|-------|---------|
+| `/testme` | Run the comp-gate comprehension workflow before commit or push |
+| `/testing` | Toggle the gate on or off locally |
+
+Equivalent CLI commands:
+
+| Command | Purpose |
+|---------|---------|
+| `npx comp-gate testing on` | Enable gating |
+| `npx comp-gate testing off` | Disable gating |
+| `npx comp-gate testing status` | Show current gate state |
+
+Gate state is stored in `.testme/config.json` (gitignored). `/testme` only runs the full workflow when the gate is on.
+
+## Quick setup
 
 ```bash
 npx comp-gate init
@@ -17,6 +70,8 @@ Non-interactive:
 ```bash
 npx comp-gate init --agent cursor --questions 3 --difficulty medium --local-only true --summary blank --yes
 ```
+
+**Migrating from v0.1.x?** Run `npx comp-gate migrate` to move root-level `SUMMARY.md`, `PROMPTS.md`, and `testme.config.json` into `testme/`.
 
 ### What gets installed
 
@@ -38,18 +93,11 @@ testme/                          # committed (team-shared)
 
 **Per machine (not in git):** `.git/hooks/pre-commit` and `pre-push` wrappers, plus agent bridge files (`.cursor/hooks.json`, skill symlinks) when `localOnly` is enabled.
 
-**Migrating from v0.1.x?** Run `npx comp-gate migrate` to move root-level `SUMMARY.md`, `PROMPTS.md`, and `testme.config.json` into `testme/`.
-
 ## Using with your agent
 
 ### Cursor
 
-After `init`, two skills are available in chat:
-
-| Skill | Purpose |
-|-------|---------|
-| `/testme` | Run the comprehension workflow before commit/push |
-| `/testing` | Toggle the gate on/off locally |
+After `init`, `/testme` and `/testing` are available in chat.
 
 Cursor hooks in `.cursor/hooks.json` block `git commit` and `git push` in the integrated terminal. Git hooks in `.git/hooks/` cover all other terminals.
 
@@ -86,8 +134,6 @@ Select `agents-md` during init (or `--agent agents-md`) to inject a portable wor
 | `npx comp-gate testing off` | Disable gating |
 | `npx comp-gate testing status` | Show current state |
 | `/testme` | Run comprehension workflow (only when gate is on) |
-
-Gate state is stored in `.testme/config.json` (gitignored) — one developer can pause gating without changing team config.
 
 ## Daily workflow
 
@@ -181,9 +227,33 @@ npm run build
 npm test
 ```
 
+Publish to npm:
+
 ```bash
 npm login
 npm publish
 ```
 
-Package name is `comp-gate` on npm (`testme` is taken). Users install with `npx comp-gate init`.
+## Contributing
+
+Contributions are welcome. This is the comp-gate source repository — the npm package and CLI are both named `comp-gate`.
+
+1. **Fork and clone** the repo from [github.com/ROrmand/comp-gate](https://github.com/ROrmand/comp-gate).
+2. **Install dependencies** and run the test suite:
+   ```bash
+   npm install
+   npm run build
+   npm test
+   ```
+3. **Make your changes.** Match existing TypeScript style and conventions in `src/`. If you change CLI behavior or install layout, update this README and any relevant docs under `docs/`.
+4. **Add or update tests** in `src/*.test.ts` when changing behavior.
+5. **Open a pull request** with a clear description of what changed and why. Link any related [issues](https://github.com/ROrmand/comp-gate/issues).
+
+**Areas where help is especially useful:**
+
+- New agent integrations beyond Cursor, Claude Code, and Windsurf
+- Better question generation and rubric quality
+- Documentation and adoption guides for large or monorepo setups
+- Bug reports and reproduction steps for hook or verify edge cases
+
+For questions or feature ideas, open an [issue](https://github.com/ROrmand/comp-gate/issues) before starting large changes.
