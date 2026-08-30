@@ -1,6 +1,6 @@
 {
   "name": "comp-gate",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Comprehension gate for desktop coding agents — block git push to main until you pass a deterministic test",
   "type": "module",
   "bin": {
