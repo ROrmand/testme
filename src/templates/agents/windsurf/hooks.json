@@ -2,7 +2,7 @@
   "hooks": {
     "pre_run_command": [
       {
-        "command": ".testme/hooks/windsurf-pre-run.sh",
+        "command": "testme/hooks/windsurf-pre-run.sh",
         "show_output": true
       }
     ]

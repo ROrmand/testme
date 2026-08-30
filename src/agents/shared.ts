@@ -1,4 +1,15 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { TEMPLATES_DIR } from "../paths.js";
 
@@ -52,42 +63,83 @@ export function readJson<T>(filePath: string): T | null {
   return JSON.parse(readFileSync(filePath, "utf8")) as T;
 }
 
-export function copySkill(agent: string, cwd: string, created: string[]): void {
-  const testmeSource = path.join(agentTemplatesDir(agent), "SKILL.md");
-  const testmeFallback = path.join(TEMPLATES_DIR, "SKILL.md");
-  const testmeSkillSource = existsSync(testmeSource) ? testmeSource : testmeFallback;
+const SKILL_LINK_TARGETS: Record<string, Record<string, string>> = {
+  cursor: {
+    testme: ".cursor/skills/testme",
+    testing: ".cursor/skills/testing",
+  },
+  claude: {
+    testme: ".claude/skills/testme",
+    testing: ".claude/skills/testing",
+  },
+  windsurf: {
+    testme: ".windsurf/skills/testme",
+    testing: ".windsurf/skills/testing",
+  },
+};
 
-  const testingSource = path.join(agentTemplatesDir(agent), "testing-SKILL.md");
-  const testingFallback = path.join(TEMPLATES_DIR, "testing-SKILL.md");
-  const testingSkillSource = existsSync(testingSource) ? testingSource : testingFallback;
+function removeIfExists(targetPath: string): void {
+  if (!existsSync(targetPath)) {
+    return;
+  }
 
-  const skillTargets: Record<string, Record<string, string>> = {
-    cursor: {
-      testme: path.join(cwd, ".cursor", "skills", "testme", "SKILL.md"),
-      testing: path.join(cwd, ".cursor", "skills", "testing", "SKILL.md"),
-    },
-    claude: {
-      testme: path.join(cwd, ".claude", "skills", "testme", "SKILL.md"),
-      testing: path.join(cwd, ".claude", "skills", "testing", "SKILL.md"),
-    },
-    windsurf: {
-      testme: path.join(cwd, ".windsurf", "skills", "testme", "SKILL.md"),
-      testing: path.join(cwd, ".windsurf", "skills", "testing", "SKILL.md"),
-    },
-  };
+  const stat = lstatSync(targetPath);
+  if (stat.isDirectory() && !stat.isSymbolicLink()) {
+    rmSync(targetPath, { recursive: true, force: true });
+    return;
+  }
 
-  const targets = skillTargets[agent];
+  rmSync(targetPath, { recursive: true, force: true });
+}
+
+function linkOrCopySkill(cwd: string, source: string, target: string, created: string[]): void {
+  const relativeSource = path.relative(path.dirname(target), source);
+  removeIfExists(target);
+
+  try {
+    mkdirSync(path.dirname(target), { recursive: true });
+    symlinkSync(relativeSource, target, "dir");
+    created.push(`${path.relative(cwd, target)} → ${relativeSource}`);
+  } catch {
+    copySkillDirectory(source, target);
+    created.push(`${path.relative(cwd, target)} (copied — symlink unavailable)`);
+  }
+}
+
+function copySkillDirectory(source: string, target: string): void {
+  mkdirSync(target, { recursive: true });
+  for (const file of readdirSync(source)) {
+    const sourcePath = path.join(source, file);
+    const targetPath = path.join(target, file);
+    if (existsSync(sourcePath) && lstatSync(sourcePath).isDirectory()) {
+      copySkillDirectory(sourcePath, targetPath);
+    } else {
+      copyAlways(sourcePath, targetPath);
+    }
+  }
+}
+
+export function linkSkill(agent: string, cwd: string, created: string[]): void {
+  const targets = SKILL_LINK_TARGETS[agent];
   if (!targets) {
     return;
   }
 
-  copyAlways(testmeSkillSource, targets.testme);
-  created.push(targets.testme.replace(`${cwd}/`, ""));
+  for (const [skillName, relativeTarget] of Object.entries(targets)) {
+    const source = path.join(cwd, "testme", "skills", skillName);
+    const target = path.join(cwd, relativeTarget);
 
-  if (existsSync(testingSkillSource)) {
-    copyAlways(testingSkillSource, targets.testing);
-    created.push(targets.testing.replace(`${cwd}/`, ""));
+    if (!existsSync(source)) {
+      continue;
+    }
+
+    linkOrCopySkill(cwd, source, target, created);
   }
+}
+
+/** @deprecated Use linkSkill */
+export function copySkill(agent: string, cwd: string, created: string[]): void {
+  linkSkill(agent, cwd, created);
 }
 
 export function chmodScripts(dir: string): void {

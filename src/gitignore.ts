@@ -18,7 +18,7 @@ const HOOK_CONFIG_PATHS: Record<Exclude<AgentId, "agents-md">, string> = {
 };
 
 export function isTestmeHookReference(value: string): boolean {
-  return value.includes(".testme/hooks/");
+  return value.includes("testme/hooks/") || value.includes(".testme/hooks/");
 }
 
 function collectCommandsFromJson(value: unknown, commands: string[]): void {
@@ -140,4 +140,29 @@ export function ensureTestmeGitignore(
   }
 
   return created;
+}
+
+export function removeTestmeGitignore(cwd: string): string[] {
+  const gitignorePath = path.join(cwd, ".gitignore");
+  if (!existsSync(gitignorePath)) {
+    return [];
+  }
+
+  const content = readFileSync(gitignorePath, "utf8");
+  const markerIndex = content.indexOf(GITIGNORE_MARKER);
+  if (markerIndex < 0) {
+    return [];
+  }
+
+  let blockStart = markerIndex;
+  if (blockStart > 0 && content[blockStart - 1] === "\n") {
+    blockStart -= 1;
+  }
+  if (blockStart > 0 && content[blockStart - 1] === "\n") {
+    blockStart -= 1;
+  }
+
+  const updated = `${content.slice(0, blockStart).replace(/\n+$/, "")}\n`;
+  writeFileSync(gitignorePath, updated.length > 1 ? updated : "", "utf8");
+  return [".gitignore (testme block removed)"];
 }

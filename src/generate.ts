@@ -75,7 +75,7 @@ export function generateSession(
 
   if (session.questions.length === 0) {
     throw new Error(
-      "No changes detected to generate questions from. Make changes or update PROMPTS.md.",
+      "No changes detected to generate questions from. Make changes or update testme/PROMPTS.md.",
     );
   }
 
@@ -86,7 +86,7 @@ export function generateSession(
 
 export function warnIfBelowMin(session: Session, config: TestmeConfig): string | null {
   if (session.questions.length < config.questions.min) {
-    return `Warning: only ${session.questions.length} question(s) generated (min ${config.questions.min}). Enrich PROMPTS.md or enable more categories.`;
+    return `Warning: only ${session.questions.length} question(s) generated (min ${config.questions.min}). Enrich testme/PROMPTS.md or enable more categories.`;
   }
   return null;
 }

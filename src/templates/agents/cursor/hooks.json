@@ -3,19 +3,19 @@
   "hooks": {
     "beforeShellExecution": [
       {
-        "command": ".testme/hooks/block-commit.sh",
+        "command": "testme/hooks/block-commit.sh",
         "matcher": "git\\s+commit",
         "failClosed": true
       },
       {
-        "command": ".testme/hooks/block-push.sh",
+        "command": "testme/hooks/block-push.sh",
         "matcher": "git\\s+push",
         "failClosed": true
       }
     ],
     "afterShellExecution": [
       {
-        "command": ".testme/hooks/after-push.sh",
+        "command": "testme/hooks/after-push.sh",
         "matcher": "git\\s+push"
       }
     ]

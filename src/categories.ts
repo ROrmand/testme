@@ -65,11 +65,15 @@ function isBoilerplatePath(filePath: string): boolean {
     filePath.startsWith(".cursor/") ||
     filePath.startsWith(".claude/") ||
     filePath.startsWith(".windsurf/") ||
+    filePath.startsWith("testme/") ||
     filePath === "AGENTS.md" ||
     filePath === ".gitignore" ||
     filePath === "PROMPTS.md" ||
+    filePath === "testme/PROMPTS.md" ||
     filePath === "SUMMARY.md" ||
-    filePath === "testme.config.json"
+    filePath === "testme/SUMMARY.md" ||
+    filePath === "testme.config.json" ||
+    filePath === "testme/config.json"
   );
 }
 

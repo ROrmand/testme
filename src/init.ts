@@ -18,8 +18,9 @@ import { detectAgents, parseAgentList } from "./agents/detect.js";
 import { chmodScripts } from "./agents/shared.js";
 import { createInitialConfig, initConfigWithWizard } from "./config-init.js";
 import { ensureTestmeGitignore } from "./gitignore.js";
-import { TEMPLATES_DIR } from "./paths.js";
+import { installDir, promptsPath, summaryPath, TESTME_TEMPLATES_DIR } from "./paths.js";
 import { bootstrapSummary } from "./bootstrap-summary.js";
+import { GIT_HOOK_MARKER } from "./constants.js";
 import {
   DEFAULT_WIZARD_CHOICES,
   type WizardChoices,
@@ -29,8 +30,6 @@ import {
 } from "./setup-wizard.js";
 import type { TestmeConfig } from "./types.js";
 import type { SummaryMode } from "./setup-wizard.js";
-
-const GIT_HOOK_MARKER = "testme-managed hook";
 
 export interface InitOptions {
   agents?: AgentId[];
@@ -52,8 +51,8 @@ function copyIfMissing(source: string, target: string): boolean {
 }
 
 export function copyHookScripts(cwd: string): void {
-  const hooksDir = path.join(TEMPLATES_DIR, "hooks");
-  const targetDir = path.join(cwd, ".testme", "hooks");
+  const hooksDir = path.join(TESTME_TEMPLATES_DIR, "hooks");
+  const targetDir = path.join(installDir(cwd), "hooks");
   mkdirSync(targetDir, { recursive: true });
 
   for (const file of readdirSync(hooksDir)) {
@@ -84,7 +83,7 @@ function installGitHookFile(
     }
   }
 
-  const scriptPath = `.testme/hooks/${scriptName}`;
+  const scriptPath = `testme/hooks/${scriptName}`;
   const content = `#!/bin/sh
 # ${GIT_HOOK_MARKER} — re-run npx comp-gate init to refresh
 exec "$(git rev-parse --show-toplevel)/${scriptPath}" "$@"
@@ -134,6 +133,23 @@ function installAgent(cwd: string, agent: AgentId, created: string[]): void {
   }
 }
 
+function installSkills(cwd: string, created: string[]): void {
+  const skillsTemplateDir = path.join(TESTME_TEMPLATES_DIR, "skills");
+  const skillsTargetDir = path.join(installDir(cwd), "skills");
+  mkdirSync(skillsTargetDir, { recursive: true });
+
+  for (const skillName of readdirSync(skillsTemplateDir)) {
+    const source = path.join(skillsTemplateDir, skillName, "SKILL.md");
+    if (!existsSync(source)) {
+      continue;
+    }
+    const target = path.join(skillsTargetDir, skillName, "SKILL.md");
+    mkdirSync(path.dirname(target), { recursive: true });
+    copyFileSync(source, target);
+    created.push(path.relative(cwd, target));
+  }
+}
+
 export function initShared(
   cwd: string,
   config: TestmeConfig,
@@ -141,32 +157,36 @@ export function initShared(
   wizard: WizardChoices = DEFAULT_WIZARD_CHOICES,
 ): string[] {
   const created: string[] = [];
-  const summaryPath = path.join(cwd, "SUMMARY.md");
+  const testmeRoot = installDir(cwd);
+  mkdirSync(testmeRoot, { recursive: true });
 
-  if (existsSync(summaryPath)) {
-    created.push("SUMMARY.md (existing, unchanged)");
+  const summaryTarget = summaryPath(cwd);
+  if (existsSync(summaryTarget)) {
+    created.push(`${path.relative(cwd, summaryTarget)} (existing, unchanged)`);
   } else if (wizard.summaryMode === "generate") {
-    mkdirSync(path.dirname(summaryPath), { recursive: true });
-    writeFileSync(summaryPath, bootstrapSummary(cwd), "utf8");
-    created.push("SUMMARY.md (generated from project metadata)");
-  } else if (copyIfMissing(path.join(TEMPLATES_DIR, "SUMMARY.md"), summaryPath)) {
-    created.push("SUMMARY.md");
+    mkdirSync(path.dirname(summaryTarget), { recursive: true });
+    writeFileSync(summaryTarget, bootstrapSummary(cwd), "utf8");
+    created.push(`${path.relative(cwd, summaryTarget)} (generated from project metadata)`);
+  } else if (copyIfMissing(path.join(TESTME_TEMPLATES_DIR, "SUMMARY.md"), summaryTarget)) {
+    created.push(path.relative(cwd, summaryTarget));
   }
 
-  if (copyIfMissing(path.join(TEMPLATES_DIR, "PROMPTS.md"), path.join(cwd, "PROMPTS.md"))) {
-    created.push("PROMPTS.md");
+  const promptsTarget = promptsPath(cwd);
+  if (copyIfMissing(path.join(TESTME_TEMPLATES_DIR, "PROMPTS.md"), promptsTarget)) {
+    created.push(path.relative(cwd, promptsTarget));
   }
 
   const configResult = initConfigWithWizard(cwd, config, applyWizard);
   if (configResult.created) {
-    created.push("testme.config.json");
+    created.push(path.relative(cwd, configResult.path));
   } else if (configResult.updated) {
-    created.push("testme.config.json (updated)");
+    created.push(`${path.relative(cwd, configResult.path)} (updated)`);
   }
 
+  installSkills(cwd, created);
   copyHookScripts(cwd);
-  chmodScripts(path.join(cwd, ".testme", "hooks"));
-  created.push(".testme/hooks/");
+  chmodScripts(path.join(testmeRoot, "hooks"));
+  created.push("testme/hooks/");
 
   for (const item of installGitHooks(cwd)) {
     created.push(item);
@@ -204,8 +224,9 @@ export async function resolveWizardChoices(
     return options.wizard;
   }
 
-  const configPath = path.join(cwd, "testme.config.json");
-  if (existsSync(configPath) && !options.force) {
+  const configPath = path.join(cwd, "testme", "config.json");
+  const legacyConfigPath = path.join(cwd, "testme.config.json");
+  if ((existsSync(configPath) || existsSync(legacyConfigPath)) && !options.force) {
     return null;
   }
 
@@ -273,30 +294,22 @@ export function initProjectSync(cwd: string, options: InitOptions = {}): string[
 
 export function resetTestmeState(cwd: string, resetPrompts = false): void {
   const testmeDir = path.join(cwd, ".testme");
-  const hooksDir = path.join(testmeDir, "hooks");
 
   if (existsSync(testmeDir)) {
     for (const entry of readdirSync(testmeDir)) {
-      if (entry === "hooks") {
-        continue;
-      }
       rmSync(path.join(testmeDir, entry), { recursive: true, force: true });
     }
   }
 
   if (resetPrompts) {
-    const promptsTemplate = path.join(TEMPLATES_DIR, "PROMPTS.md");
-    writeFileSync(path.join(cwd, "PROMPTS.md"), readFileSync(promptsTemplate, "utf8"), "utf8");
-  }
-
-  if (!existsSync(hooksDir)) {
-    copyHookScripts(cwd);
+    const promptsTemplate = path.join(TESTME_TEMPLATES_DIR, "PROMPTS.md");
+    writeFileSync(promptsPath(cwd), readFileSync(promptsTemplate, "utf8"), "utf8");
   }
 }
 
 export function resetPromptsAfterPush(cwd: string): void {
-  const promptsTemplate = path.join(TEMPLATES_DIR, "PROMPTS.md");
-  writeFileSync(path.join(cwd, "PROMPTS.md"), readFileSync(promptsTemplate, "utf8"), "utf8");
+  const promptsTemplate = path.join(TESTME_TEMPLATES_DIR, "PROMPTS.md");
+  writeFileSync(promptsPath(cwd), readFileSync(promptsTemplate, "utf8"), "utf8");
   resetTestmeState(cwd, false);
 }
 

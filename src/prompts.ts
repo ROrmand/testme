@@ -1,13 +1,13 @@
 import { readFileSync, existsSync } from "node:fs";
-import { PROMPTS_PATH, SUMMARY_PATH } from "./paths.js";
+import { promptsPath, summaryPath } from "./paths.js";
 import { extractTerms } from "./diff.js";
 import type { PromptsSection } from "./types.js";
 
-export function readTextFile(path: string): string {
-  if (!existsSync(path)) {
+export function readTextFile(filePath: string): string {
+  if (!existsSync(filePath)) {
     return "";
   }
-  return readFileSync(path, "utf8");
+  return readFileSync(filePath, "utf8");
 }
 
 export function parsePrompts(content: string): PromptsSection[] {
@@ -38,11 +38,11 @@ export function parsePrompts(content: string): PromptsSection[] {
 }
 
 export function loadPromptsSections(): PromptsSection[] {
-  return parsePrompts(readTextFile(PROMPTS_PATH));
+  return parsePrompts(readTextFile(promptsPath()));
 }
 
 export function loadSummary(): string {
-  return readTextFile(SUMMARY_PATH);
+  return readTextFile(summaryPath());
 }
 
 export function termsForFile(sections: PromptsSection[], filePath: string): string[] {

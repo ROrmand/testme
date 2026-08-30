@@ -1,8 +1,10 @@
 node_modules/
 dist/
-.testme/
 *.tsbuildinfo
 
-# testme local setup — run npx comp-gate init (do not commit)
+# testme session state (local per developer)
 .testme/
+
+# testme agent bridge (local per developer — run npx comp-gate init)
 .cursor/skills/testme/
+.cursor/skills/testing/

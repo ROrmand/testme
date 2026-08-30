@@ -22,7 +22,7 @@ Gate `git commit` (when `gateCommits` is enabled) and `git push` to protected br
 
 ```
 Task Progress:
-- [ ] Step 1: Update PROMPTS.md with session changes
+- [ ] Step 1: Update testme/PROMPTS.md with session changes
 - [ ] Step 2: Run npx comp-gate generate
 - [ ] Step 3: Read referenced files; write .testme/references.json
 - [ ] Step 4: Ask each question in chat; collect answers from user replies
@@ -30,9 +30,9 @@ Task Progress:
 - [ ] Step 6: Commit and push only after PASS
 ```
 
-### Step 1: Update PROMPTS.md
+### Step 1: Update testme/PROMPTS.md
 
-Before generating questions, ensure `PROMPTS.md` documents what changed:
+Before generating questions, ensure `testme/PROMPTS.md` documents what changed:
 
 ```markdown
 # Session Changes
@@ -49,7 +49,7 @@ Write bullets as you work. If empty, update from `git diff --stat` first.
 npx comp-gate generate
 ```
 
-Reads `SUMMARY.md`, `PROMPTS.md`, and git diff. Writes `.testme/session.json`.
+Reads `testme/SUMMARY.md`, `testme/PROMPTS.md`, and git diff. Writes `.testme/session.json`.
 
 Announce how many questions were generated and list their ids/categories.
 
@@ -64,13 +64,13 @@ Write `.testme/references.json`:
   "diffHash": "<same as session.json>",
   "generatedAt": "<ISO timestamp>",
   "references": {
-    "q1": "A complete reference answer explaining what changed and why, based on the code and PROMPTS.md.",
+    "q1": "A complete reference answer explaining what changed and why, based on the code and testme/PROMPTS.md.",
     "q2": "A reference answer describing how the change fits the project architecture."
   }
 }
 ```
 
-Reference answers are the **gold standard** you will compare user replies against. Write them from your understanding of the code — not by copying PROMPTS.md bullets verbatim.
+Reference answers are the **gold standard** you will compare user replies against. Write them from your understanding of the code — not by copying testme/PROMPTS.md bullets verbatim.
 
 ### Step 4: Conversational Q&A (in chat)
 
@@ -146,7 +146,7 @@ git push origin <protected-branch>
 
 ## Gate configuration
 
-In `testme.config.json`:
+In `testme/config.json`:
 
 ```json
 {
@@ -169,9 +169,9 @@ In `testme.config.json`:
 
 ## Grading mode
 
-Default is **semantic** (`grading: "semantic"` in `testme.config.json`). Set `passThreshold` (default `70`) for minimum accuracy % per question. Legacy keyword mode: `"grading": "keywords"`.
+Default is **semantic** (`grading: "semantic"` in `testme/config.json`). Set `passThreshold` (default `70`) for minimum accuracy % per question. Legacy keyword mode: `"grading": "keywords"`.
 
-## SUMMARY.md
+## testme/SUMMARY.md
 
 Update only when architecture, stack, or major conventions change — not every commit.
 
@@ -186,7 +186,7 @@ Add a `## Domain` section to steer auto-detection:
 
 ## Configure categories
 
-Question count and knowledge areas are configured in `testme.config.json` (team defaults) with optional local overrides in `.testme/config.json`.
+Question count and knowledge areas are configured in `testme/config.json` (team defaults) with optional local overrides in `.testme/config.json`.
 
 ### Checkbox-style categories
 
@@ -237,14 +237,14 @@ npx comp-gate generate --max-questions 3 --category changeRationale,runtime,test
 
 **Security tooling project** — enable `cybersecurity`, `security`; disable `machineLearning`.
 
-Ask the user which categories matter if unclear, then update `testme.config.json`.
+Ask the user which categories matter if unclear, then update `testme/config.json`.
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
 | Session stale | Re-run `npx comp-gate generate` |
-| Missing terms | Add clearer bullets to `PROMPTS.md` |
+| Missing terms | Add clearer bullets to `testme/PROMPTS.md` |
 | Commit blocked | `gateCommits` is on — run `/testme` before committing |
 | Push blocked | Run `/testme` or `npx comp-gate generate` → answer → `verify` |
 | Pass invalid | `npx comp-gate status` — verify then commit/push |

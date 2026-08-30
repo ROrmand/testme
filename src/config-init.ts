@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import path from "node:path";
+import { repoConfigPath } from "./paths.js";
 import { DEFAULT_CONFIG, loadConfig, mergeConfig, normalizeConfig, stripDetected, writeConfigFile } from "./config.js";
 import { analyzeDiff } from "./diff.js";
 import { applyDetectionToConfig, detectProject } from "./detect.js";
@@ -15,7 +15,7 @@ export function createInitialConfig(cwd: string): TestmeConfig {
 }
 
 export function initConfig(cwd: string, force = false): { created: boolean; path: string; config: TestmeConfig } {
-  const configPath = path.join(cwd, "testme.config.json");
+  const configPath = repoConfigPath(cwd);
 
   if (existsSync(configPath) && !force) {
     return { created: false, path: configPath, config: loadConfig(cwd) };
@@ -32,7 +32,7 @@ export function initConfigWithWizard(
   config: TestmeConfig,
   applyWizard = true,
 ): { created: boolean; updated: boolean; path: string; config: TestmeConfig } {
-  const configPath = path.join(cwd, "testme.config.json");
+  const configPath = repoConfigPath(cwd);
   const exists = existsSync(configPath);
 
   if (exists && !applyWizard) {

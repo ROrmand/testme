@@ -1,8 +1,8 @@
 # testme
 
-Comprehension gate for desktop coding agents. **testme** blocks `git commit` (when enabled) and `git push` to protected branches until you pass a comprehension test describing what changed.
+Comprehension gate for desktop coding agents. Blocks `git commit` (when enabled) and `git push` to protected branches until you pass a comprehension test.
 
-Published on npm as [`comp-gate`](https://www.npmjs.com/package/comp-gate). The CLI command is `comp-gate` (alias: `testme`).
+Published on npm as [`comp-gate`](https://www.npmjs.com/package/comp-gate). CLI: `npx comp-gate` (alias: `testme`).
 
 ## Quick start
 
@@ -10,319 +10,168 @@ Published on npm as [`comp-gate`](https://www.npmjs.com/package/comp-gate). The 
 npx comp-gate init
 ```
 
-The setup wizard detects your desktop agent (Cursor, Claude Code, Windsurf), asks how many questions you want, how difficult they should be, whether to keep agent skills local-only in `.gitignore`, and whether to start with a blank `SUMMARY.md` or generate one from project metadata, then installs the integration.
+The wizard detects your agent (Cursor, Claude Code, Windsurf), configures question count and difficulty, and installs everything into a single `testme/` folder.
 
-Non-interactive example:
+Non-interactive:
 
 ```bash
 npx comp-gate init --agent cursor --questions 3 --difficulty medium --local-only true --summary blank --yes
 ```
 
-### Adopting an existing repository
-
-During `init`, the wizard asks how to set up `SUMMARY.md`:
-
-- **Blank (default)** — empty template; you fill in stack, layout, and conventions once. Best for large or monorepo codebases.
-- **Generate** — drafts `SUMMARY.md` from README, manifests, and top-level folders only (not a full codebase scan).
-
-On repos with **500+ tracked files**, the wizard recommends blank and warns that auto-generation is often shallow or misleading at that scale.
-
-- Large repos: prefer blank — a hand-written map at package/layer granularity beats a shallow auto-draft.
-- Staleness: generated summaries reflect init-time metadata and need manual upkeep.
-- Token efficiency: comp-gate reads `SUMMARY.md` for architecture questions; keep it short and accurate.
-
-See [adopting existing repos](https://github.com/ROrmand/comp-gate/blob/main/docs/adopting-existing-repos.md) for the full guide.
-
-```bash
-npx comp-gate init --summary blank    # default
-npx comp-gate init --summary generate # draft from README + manifests
-```
-
 ### What gets installed
 
-**Committed (team-shared):**
+```
+testme/                          # committed (team-shared)
+├── SUMMARY.md                   # project map
+├── PROMPTS.md                   # session change log
+├── config.json                  # question count, difficulty, protected branches
+├── hooks/                       # shell hook scripts
+└── skills/
+    ├── testme/SKILL.md          # /testme workflow
+    └── testing/SKILL.md         # /testing toggle
 
-- `SUMMARY.md` — stable project map (blank template or generated from project metadata at init)
-- `PROMPTS.md` — session change log (resets after successful push to `main`)
-- `testme.config.json` — question count, difficulty, protected branches
-- `AGENTS.md` — portable workflow section (when selected)
+.testme/                         # gitignored (session state per developer)
+├── session.json
+├── answers.json
+└── config.json                  # local gate toggle overrides
+```
 
-**Local only (gitignored — each developer runs `npx comp-gate init` after clone):**
+**Per machine (not in git):** `.git/hooks/pre-commit` and `pre-push` wrappers, plus agent bridge files (`.cursor/hooks.json`, skill symlinks) when `localOnly` is enabled.
 
-- `.testme/` — session state and hook scripts
-- `.cursor/skills/testme/`, `.cursor/skills/testing/`, `.claude/skills/testme/`, `.claude/skills/testing/`, `.windsurf/skills/testme/`, `.windsurf/skills/testing/` — agent skills
-- Agent hook configs (`.cursor/hooks.json`, `.claude/settings.json`, `.windsurf/hooks.json`) when testme-only
+**Migrating from v0.1.x?** Run `npx comp-gate migrate` to move root-level `SUMMARY.md`, `PROMPTS.md`, and `testme.config.json` into `testme/`.
 
-**Always installed per machine:**
+## Using with your agent
 
-- `.git/hooks/pre-commit` and `pre-push` — blocks commit/push in any terminal
+### Cursor
 
-### Supported agents
+After `init`, two skills are available in chat:
 
-| Agent | Integration |
-|-------|-------------|
-| Cursor | `.cursor/hooks.json` + `/testme` and `/testing` skills |
-| Claude Code | `.claude/settings.json` PreToolUse hooks + skills |
-| Windsurf | `.windsurf/hooks.json` pre_run_command hooks + skills |
-| AGENTS.md | Portable workflow docs (fallback) |
+| Skill | Purpose |
+|-------|---------|
+| `/testme` | Run the comprehension workflow before commit/push |
+| `/testing` | Toggle the gate on/off locally |
 
-Git hooks are the universal safety net when agent shell hooks are unavailable (e.g. some Claude Desktop sessions).
+Cursor hooks in `.cursor/hooks.json` block `git commit` and `git push` in the integrated terminal. Git hooks in `.git/hooks/` cover all other terminals.
 
-## Toggle gating with `/testing`
-
-Use `/testing` in chat (or `npx comp-gate testing`) to turn the comprehension gate on or off **locally** — state is stored in `.testme/config.json` (gitignored), so one developer can pause gating without changing team config.
-
-| Skill / command | Purpose |
-|-----------------|---------|
-| `/testing` | Toggle gate on/off (default) |
-| `npx comp-gate testing on` | Enable gating |
-| `npx comp-gate testing off` | Disable gating (commit/push no longer require `/testme`) |
-| `npx comp-gate testing status` | Show current state with status banner |
-| `/testme` | Run comprehension workflow (only when gate is on) |
-
-When the gate is **off**, hooks allow commit and push without verification. Re-enable before pushing to protected branches in team workflows.
-
-### Status line indicator
-
-For a persistent on/off indicator above the Cursor prompt, add this to `~/.cursor/cli-config.json`:
+**Status line** — add to `~/.cursor/cli-config.json` for a persistent on/off indicator:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "sh -c 'cd \"$PWD\" && .testme/hooks/statusline.sh'",
+    "command": "sh -c 'cd \"$PWD\" && testme/hooks/statusline.sh'",
     "padding": 2
   }
 }
 ```
 
-`npx comp-gate init` installs `.testme/hooks/statusline.sh`, which runs `npx comp-gate statusline`:
+### Claude Code
 
-- Gate on: `🟢 testme`
-- Gate off: `🔴 testme off`
+`init` merges PreToolUse hooks into `.claude/settings.json` and symlinks skills into `.claude/skills/testme/` and `.claude/skills/testing/`.
 
-Running `/testing` also prints an in-chat banner:
+### Windsurf
 
-```
-┌─────────────────────────┐
-│  testme gate:  ON  🟢   │
-└─────────────────────────┘
-```
+`init` merges `pre_run_command` hooks into `.windsurf/hooks.json` and symlinks skills into `.windsurf/skills/`.
 
-## Workflow
+### AGENTS.md
+
+Select `agents-md` during init (or `--agent agents-md`) to inject a portable workflow section into `AGENTS.md`. Git hooks remain the universal safety net.
+
+## Toggle gating with `/testing`
+
+| Skill / command | Purpose |
+|-----------------|---------|
+| `/testing` | Toggle gate on/off (default) |
+| `npx comp-gate testing on` | Enable gating |
+| `npx comp-gate testing off` | Disable gating |
+| `npx comp-gate testing status` | Show current state |
+| `/testme` | Run comprehension workflow (only when gate is on) |
+
+Gate state is stored in `.testme/config.json` (gitignored) — one developer can pause gating without changing team config.
+
+## Daily workflow
 
 ```mermaid
 flowchart TD
-    work[Make changes] --> prompts[Update PROMPTS.md]
+    work[Make changes] --> prompts[Update testme/PROMPTS.md]
     prompts --> gen[npx comp-gate generate]
-    gen --> answer[Answer questions in chat]
-    answer --> write[Agent writes .testme/answers.json]
-    write --> verify[npx comp-gate verify]
-    verify -->|PASS| push[git push origin main]
+    gen --> answer[Answer questions in chat via /testme]
+    answer --> verify[npx comp-gate verify]
+    verify -->|PASS| push[git push]
     verify -->|FAIL| fix[Fix answers or PROMPTS.md]
-    push --> reset[PROMPTS.md resets via hook]
+    push --> reset[testme/PROMPTS.md resets via hook]
 ```
 
-### 1. Document changes in PROMPTS.md
-
-```markdown
-# Session Changes
-
-## src/auth.ts
-- Added validateToken middleware; checks JWT expiry before route handlers
-```
-
-Write bullets as you work — they become the answer rubric.
-
-### 2. Generate questions
-
-```bash
-npx comp-gate generate
-```
-
-Reads `SUMMARY.md`, `PROMPTS.md`, and git diff only. Produces 3–5 targeted questions in `.testme/session.json`.
-
-### 3. Answer questions (in chat)
-
-Run `/testme` in Cursor. The agent asks each question one at a time in chat — reply in plain messages. The agent writes `.testme/answers.json` from your replies before verifying.
-
-For each question, read only the files listed in that question's `files[]` array if you need to check your answer.
-
-### 4. Verify (semantic grading)
-
-The agent generates reference answers, asks you questions in chat, then grades your replies with an **accuracy score (0–100)** and **alignment** (`low` / `medium` / `high`) per question. Default pass threshold is **70%** accuracy (`passThreshold` in config).
-
-```bash
-npx comp-gate verify
-```
-
-On pass, `.testme/pass.json` is written.
-
-### 5. Push
-
-```bash
-git push origin main
-```
-
-After a successful push, `PROMPTS.md` resets automatically.
+1. **Document changes** in `testme/PROMPTS.md` as you work.
+2. **Generate** — `npx comp-gate generate` (reads `testme/SUMMARY.md`, `testme/PROMPTS.md`, git diff).
+3. **Answer** — run `/testme` in chat; reply to each question.
+4. **Verify** — agent grades semantically, then `npx comp-gate verify`.
+5. **Push** — after PASS, `git push` is allowed. `testme/PROMPTS.md` resets on successful push.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `comp-gate init` | Interactive setup wizard: detect agent, configure questions/difficulty, install hooks and skills |
-| `comp-gate init --agent all --yes` | Install all agent integrations without prompts |
-| `comp-gate init --questions 5 --difficulty hard --force` | Override question count and difficulty |
-| `comp-gate hook install-git` | Re-install git `pre-commit` / `pre-push` hooks only |
+| `comp-gate init` | Interactive setup wizard |
+| `comp-gate init --agent all --yes` | Install all agent integrations |
+| `comp-gate migrate` | Move legacy root files into `testme/` |
+| `comp-gate uninstall` | Remove hooks, skills, and integration (`--yes` to confirm) |
+| `comp-gate uninstall --keep-data --yes` | Remove integration but keep `testme/` folder |
 | `comp-gate generate` | Generate questions from diff + md files |
-| `comp-gate generate --max-questions 3` | One-off question count override |
-| `comp-gate generate --category runtime,testing` | One-off category filter |
-| `comp-gate detect` | Show auto-detected domain categories |
-| `comp-gate config init` | Create `testme.config.json` with detected defaults |
-| `comp-gate config show` | Print merged config (repo + local overrides) |
 | `comp-gate verify` | Score answers in `.testme/answers.json` |
-| `comp-gate status` | Check if current pass is valid and whether gate is enabled |
-| `comp-gate testing` | Toggle comprehension gate on/off (local) |
-| `comp-gate testing on` / `off` / `status` | Explicitly enable, disable, or show gate state |
-| `comp-gate statusline` | One-line gate status for Cursor status line |
+| `comp-gate testing` | Toggle gate on/off |
+| `comp-gate status` | Check pass validity and gate state |
+| `comp-gate detect` | Show auto-detected domain categories |
+| `comp-gate config init` | Create `testme/config.json` |
+| `comp-gate config show` | Print merged config |
 | `comp-gate reset` | Clear `.testme/` session state |
+| `comp-gate hook install-git` | Re-install git hooks only |
 
-## Customization
+## Configuration
 
-### Protected branches and commit gating
-
-Configure in `testme.config.json`:
+Edit `testme/config.json`:
 
 ```json
 {
   "protectedBranches": ["main"],
   "gateCommits": true,
-  "autoProtectCurrentBranch": true
-}
-```
-
-- `protectedBranches` — always-protected branches (e.g. `main`)
-- `autoProtectCurrentBranch` — also gate pushes to whatever branch you have checked out (default `true`)
-- `gateCommits` — when `true`, `git commit` is blocked until `/testme` passes
-
-Blocked push message: `You must run the /testme skill before pushing to 'main'.`
-
-**Terminal blocking:** `npx comp-gate init` installs native git hooks into `.git/hooks/`. The Cursor integrated terminal does **not** run Cursor `beforeShellExecution` hooks — git hooks cover that gap.
-
-### Question count and difficulty
-
-Set during `comp-gate init` or in `testme.config.json`:
-
-| Difficulty | Pass threshold | Alignment required | Categories |
-|------------|----------------|--------------------|------------|
-| easy | 60% | low+ | changeRationale, symbols |
-| medium | 70% | medium+ | balanced + auto-detect |
-| hard | 85% | high only | + architecture, runtime, security |
-
-```json
-{
-  "questions": { "min": 2, "max": 3 },
+  "autoProtectCurrentBranch": true,
+  "questions": { "min": 2, "max": 5 },
   "difficulty": "medium",
-  "passThreshold": 70,
-  "minAlignment": "medium"
+  "passThreshold": 70
 }
 ```
 
-### Question count (generate)
+| Difficulty | Pass threshold | Alignment required |
+|------------|----------------|--------------------|
+| easy | 60% | low+ |
+| medium | 70% | medium+ |
+| hard | 85% | high only |
 
-Configure in `testme.config.json`:
+Run `npx comp-gate detect` to see auto-suggested domain categories. Local overrides go in `.testme/config.json`.
 
-```json
-{
-  "questions": { "min": 2, "max": 5 }
-}
-```
+## Adopting an existing repository
 
-Local override in `.testme/config.json` (gitignored via `.testme/`):
-
-```json
-{ "questions": { "max": 3 } }
-```
-
-### Category checkboxes
-
-Each category is a boolean in `categories`. Core categories work everywhere; domain categories are auto-suggested when relevant.
-
-| Category | Focus |
-|----------|-------|
-| `changeRationale` | What changed per file and why |
-| `symbols` | What added/changed symbols do |
-| `architecture` | Fit with SUMMARY.md structure |
-| `runtime` | Run, test, deploy impact |
-| `dataStructures` | Algorithms and data structures used |
-| `dependencies` | Package/manifest changes |
-| `testing` | Test coverage and assertions |
-| `errorHandling` | Errors and edge cases |
-| `apiContracts` | API/schema/interface changes |
-| `security` | Auth, validation, secrets |
-| `performance` | Caching, complexity, bottlenecks |
-| `database` | Schema, queries, migrations |
-| `machineLearning` | Training, inference, metrics |
-| `cybersecurity` | Threat model, mitigations |
-| `frontend` | UI components and state |
-| `backend` | Routes, middleware, services |
-| `devops` | CI/CD, containers, infra |
-| `mobile` | Platform-specific behavior |
-| `dataEngineering` | Pipelines, ETL, lineage |
-
-### Project-aware detection
+See [adopting existing repos](docs/adopting-existing-repos.md) for blank vs generated `testme/SUMMARY.md`, large-repo guidance, and migration from v0.1.x.
 
 ```bash
-npx comp-gate detect
+npx comp-gate init --summary blank     # default
+npx comp-gate init --summary generate  # draft from README + manifests
+npx comp-gate migrate                  # upgrade from root-level layout
 ```
-
-Signals: `SUMMARY.md` `## Domain` section, `package.json`/`pyproject.toml` deps, diff file paths.
-
-**ML example** — `comp-gate detect` enables `machineLearning`; disable `cybersecurity` in config.
-
-**Security example** — enable `cybersecurity` and `security`; leave `machineLearning` false.
-
-```json
-{
-  "autoDetect": true,
-  "categories": {
-    "machineLearning": true,
-    "dataStructures": true,
-    "cybersecurity": false
-  }
-}
-```
-
-Add to `SUMMARY.md`:
-
-```markdown
-## Domain
-
-- Primary: machine learning
-- Focus areas: model training, evaluation metrics, inference API
-```
-
-## Why PROMPTS.md matters
-
-`PROMPTS.md` is the cheap answer key. Agents document changes as they work, so verification doesn't require re-reading full diffs or scanning the codebase. Better bullets → better rubrics → easier pass.
-
-## Token efficiency
-
-- No full-repo scans — only git diff metadata + two md files
-- Configurable question count and categories via `testme.config.json`
-- Semantic grading by default (agent compares your answers to reference answers)
-- Targeted file reads via `files[]` pointers in session
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
-| Push blocked | Run `/testme` or `npx comp-gate generate` → answer → `verify` |
-| Commit blocked | `gateCommits` is on — run `/testme` before committing |
+| Push blocked | Run `/testme` or `generate` → answer → `verify` |
+| Commit blocked | `gateCommits` is on — run `/testme` first |
 | Session stale | Re-run `generate` after new edits |
-| Missing terms | Add clearer bullets to `PROMPTS.md` |
+| Missing terms | Add clearer bullets to `testme/PROMPTS.md` |
 | Pass invalid | `npx comp-gate status` — diff changed since verify |
-| Gate disabled | Run `/testing` or `npx comp-gate testing on` to re-enable |
+| Gate disabled | Run `/testing` or `npx comp-gate testing on` |
+| Legacy paths | Run `npx comp-gate migrate` |
+| Uninstall | `npx comp-gate uninstall --yes` (add `--keep-data` to preserve `testme/`) |
 
 ## Development
 
@@ -332,22 +181,9 @@ npm run build
 npm test
 ```
 
-### Publishing
-
 ```bash
 npm login
 npm publish
 ```
 
-The package name on npm is `comp-gate` (the unscoped name `testme` is taken by an unrelated package). After publishing, users install with:
-
-```bash
-npx comp-gate init
-```
-
-## Limitations (v1)
-
-- Symbol extraction uses regex (TS/JS/Python/Go patterns) — not a full AST parser
-- Protected branches configurable via `protectedBranches` in `testme.config.json` (`--branch` flag to override)
-- Optional commit gating via `gateCommits: true` in `testme.config.json`
-- Verification is semantic by default (`grading: "semantic"`); legacy keyword mode available
+Package name is `comp-gate` on npm (`testme` is taken). Users install with `npx comp-gate init`.

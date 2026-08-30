@@ -10,7 +10,10 @@ import { generateSession, parseCategoryList, warnIfBelowMin } from "./generate.j
 import { resolveConfig } from "./generate.js";
 import { afterPushHook, beforeCommitHook, beforePushHook, beforePushRefHook, resolveProtectedBranches, resolveWorkingBranch } from "./hooks.js";
 import { copyHookScripts, installGitHooks, resetTestmeState } from "./init.js";
+import { migrateProject } from "./migrate.js";
+import { planUninstall, uninstallProject } from "./uninstall.js";
 import { promptsHasContent } from "./prompts.js";
+import { repoConfigPath } from "./paths.js";
 import { isPassValid, loadPassFile, loadSession, verifySession } from "./verify.js";
 import {
   formatGateBanner,
@@ -34,7 +37,7 @@ program
   .option("--questions <n>", "number of questions per session (1-5)")
   .option("--difficulty <level>", "easy, medium, or hard")
   .option("--local-only <bool>", "gitignore agent skills (true/false); default true")
-  .option("--summary <mode>", "SUMMARY.md setup: blank (default) or generate")
+  .option("--summary <mode>", "testme/SUMMARY.md setup: blank (default) or generate")
   .option("--yes", "skip interactive prompts")
   .option("--force", "re-run wizard and overwrite config preferences")
   .action(async (options) => {
@@ -59,7 +62,7 @@ program
       options.localOnly !== undefined ||
       options.summary
     ) {
-      if (options.force || !existsSync(path.join(process.cwd(), "testme.config.json"))) {
+      if (options.force || !existsSync(repoConfigPath(process.cwd()))) {
         initOptions.wizard = {
           questions: options.questions
             ? parseQuestionsOption(options.questions)
@@ -86,7 +89,7 @@ program
 
 program
   .command("generate")
-  .description("Generate comprehension questions from SUMMARY.md, PROMPTS.md, and git diff")
+  .description("Generate comprehension questions from testme/SUMMARY.md, testme/PROMPTS.md, and git diff")
   .option("--max-questions <n>", "override max question count", (v) => Number.parseInt(v, 10))
   .option("--min-questions <n>", "override min question count", (v) => Number.parseInt(v, 10))
   .option("--category <list>", "comma-separated category keys to enable for this run")
@@ -95,7 +98,7 @@ program
     const cwd = process.cwd();
 
     if (!promptsHasContent()) {
-      console.warn("Warning: PROMPTS.md has no change bullets yet. Add session notes for better rubrics.");
+      console.warn("Warning: testme/PROMPTS.md has no change bullets yet. Add session notes for better rubrics.");
     }
 
     const generateOptions = {
@@ -145,8 +148,8 @@ const configCmd = program.command("config").description("Manage testme configura
 
 configCmd
   .command("init")
-  .description("Create testme.config.json with auto-detected category defaults")
-  .option("--force", "overwrite existing testme.config.json")
+  .description("Create testme/config.json with auto-detected category defaults")
+  .option("--force", "overwrite existing testme/config.json")
   .action((options) => {
     const result = initConfig(process.cwd(), Boolean(options.force));
     if (result.created) {
@@ -249,7 +252,7 @@ program
     }
 
     if (!promptsHasContent()) {
-      console.log("PROMPTS.md is empty — document changes before generate.");
+      console.log("testme/PROMPTS.md is empty — document changes before generate.");
     }
   });
 
@@ -320,7 +323,7 @@ program
 
 program
   .command("reset")
-  .description("Clear .testme session state without touching PROMPTS.md")
+  .description("Clear .testme session state without touching testme/PROMPTS.md")
   .action(() => {
     resetTestmeState(process.cwd(), false);
     console.log("Cleared .testme/ session state.");
@@ -411,7 +414,7 @@ hook
 
 hook
   .command("after-push")
-  .description("Reset PROMPTS.md and session state after successful push to a protected branch")
+  .description("Reset testme/PROMPTS.md and session state after successful push to a protected branch")
   .option("-c, --command <cmd>", "shell command that was executed")
   .action((options, cmd) => {
     const branch = cmd.parent?.parent?.opts().branch ?? undefined;
@@ -421,6 +424,50 @@ hook
       afterPushHook(process.cwd(), "git push origin main", branch);
     }
     process.exit(0);
+  });
+
+program
+  .command("migrate")
+  .description("Move legacy root-level testme files into testme/ and refresh hooks/skills")
+  .action(() => {
+    const changes = migrateProject(process.cwd());
+    console.log("comp-gate migration complete.");
+    for (const item of changes) {
+      console.log(`  + ${item}`);
+    }
+  });
+
+program
+  .command("uninstall")
+  .description("Remove testme hooks, skills, and integration from the current repo")
+  .option("--yes", "confirm removal without prompting")
+  .option("--keep-data", "keep testme/ (SUMMARY.md, PROMPTS.md, config.json)")
+  .action((options) => {
+    const cwd = process.cwd();
+    const planned = planUninstall(cwd, { keepData: Boolean(options.keepData) });
+
+    if (planned.length === 0) {
+      console.log("No testme integration found in this repository.");
+      return;
+    }
+
+    if (!options.yes) {
+      console.log("The following will be removed:");
+      for (const item of planned) {
+        console.log(`  - ${item}`);
+      }
+      console.log("\nRe-run with --yes to confirm.");
+      if (!options.keepData) {
+        console.log("Use --keep-data to preserve testme/ while removing hooks and skills.");
+      }
+      return;
+    }
+
+    const removed = uninstallProject(cwd, { keepData: Boolean(options.keepData), yes: true });
+    console.log("comp-gate uninstalled.");
+    for (const item of removed) {
+      console.log(`  - ${item}`);
+    }
   });
 
 program.parse();

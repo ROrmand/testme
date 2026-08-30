@@ -32,8 +32,9 @@ function emptyProjectDir(): string {
 function projectWithGateDisabled(): string {
   const cwd = emptyProjectDir();
   mkdirSync(path.join(cwd, ".testme"), { recursive: true });
+  mkdirSync(path.join(cwd, "testme"), { recursive: true });
   writeFileSync(
-    path.join(cwd, "testme.config.json"),
+    path.join(cwd, "testme", "config.json"),
     JSON.stringify({ gateCommits: true, protectedBranches: ["main"] }),
     "utf8",
   );

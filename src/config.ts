@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { LOCAL_CONFIG_PATH, REPO_CONFIG_PATH } from "./paths.js";
+import { repoConfigPath } from "./paths.js";
 import type {
   CategoryKey,
   GenerateOptions,
@@ -108,7 +108,7 @@ export function normalizeConfig(config: TestmeConfig): TestmeConfig {
 }
 
 export function loadConfig(cwd: string = process.cwd()): TestmeConfig {
-  const repoPath = path.join(cwd, "testme.config.json");
+  const repoPath = repoConfigPath(cwd);
   const localPath = path.join(cwd, ".testme", "config.json");
 
   let config = mergeConfig(DEFAULT_CONFIG, readJsonFile(repoPath));

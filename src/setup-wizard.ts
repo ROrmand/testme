@@ -243,15 +243,15 @@ export async function promptWizardChoices(cwd = process.cwd()): Promise<WizardCh
     const stats = measureRepo(cwd);
     const largeLabel = stats.isLarge ? " (large)" : "";
 
-    console.log("\nSUMMARY.md setup");
+    console.log("\ntestme/SUMMARY.md setup");
     console.log(`\nThis repository has ~${stats.trackedFiles.toLocaleString()} tracked files${largeLabel}.`);
-    console.log("\n  Blank: install an empty template. You fill SUMMARY.md once with");
+    console.log("\n  Blank: install an empty template. You fill testme/SUMMARY.md once with");
     if (stats.isLarge) {
       console.log("         high-level architecture (recommended for large repos).");
     } else {
       console.log("         high-level architecture.");
     }
-    console.log("\n  Generate: draft SUMMARY.md from README, package.json/pyproject.toml,");
+    console.log("\n  Generate: draft testme/SUMMARY.md from README, package.json/pyproject.toml,");
     console.log("            and top-level folders only — not a full codebase summary.");
 
     if (stats.isLarge) {
@@ -266,7 +266,7 @@ export async function promptWizardChoices(cwd = process.cwd()): Promise<WizardCh
       ? "1. Start blank (recommended for large repos)"
       : "1. Start blank (recommended)";
     console.log(`\n  ${blankLabel}`);
-    console.log("  2. Generate SUMMARY.md from project metadata");
+    console.log("  2. Generate testme/SUMMARY.md from project metadata");
 
     const summaryRaw = await ask(rl, "> ");
     let summaryMode: SummaryMode;

@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { linkSkill } from "./agents/shared.js";
 import { buildGitignorePlan, GITIGNORE_MARKER, hookConfigHasNonTestmeContent } from "./gitignore.js";
 import { initProjectSync } from "./init.js";
+import { migrateProject } from "./migrate.js";
 
 describe("gitignore planning", () => {
   let tempDir: string;
@@ -70,10 +72,11 @@ describe("initProjectSync", () => {
     });
 
     expect(created.some((item) => item.includes(".cursor/hooks.json"))).toBe(true);
-    expect(existsSync(path.join(tempDir, ".testme", "hooks", "block-push.sh"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "testme", "hooks", "block-push.sh"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "testme", "skills", "testme", "SKILL.md"))).toBe(true);
     expect(existsSync(path.join(tempDir, ".cursor", "skills", "testme", "SKILL.md"))).toBe(true);
     expect(existsSync(path.join(tempDir, ".cursor", "skills", "testing", "SKILL.md"))).toBe(true);
-    expect(existsSync(path.join(tempDir, ".testme", "hooks", "statusline.sh"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "testme", "hooks", "statusline.sh"))).toBe(true);
 
     const gitignore = readFileSync(path.join(tempDir, ".gitignore"), "utf8");
     expect(gitignore).toContain(GITIGNORE_MARKER);
@@ -111,7 +114,7 @@ describe("initProjectSync", () => {
     expect(gitignore).not.toContain(".cursor/hooks.json");
   });
 
-  it("generates SUMMARY.md when summaryMode is generate", () => {
+  it("generates testme/SUMMARY.md when summaryMode is generate", () => {
     tempDir = mkdtempSync(path.join(tmpdir(), "testme-init-"));
     mkdirSync(path.join(tempDir, ".git", "hooks"), { recursive: true });
     mkdirSync(path.join(tempDir, "src"));
@@ -127,8 +130,59 @@ describe("initProjectSync", () => {
     });
 
     expect(created.some((item) => item.includes("SUMMARY.md (generated"))).toBe(true);
-    const summary = readFileSync(path.join(tempDir, "SUMMARY.md"), "utf8");
+    const summary = readFileSync(path.join(tempDir, "testme", "SUMMARY.md"), "utf8");
     expect(summary).toContain("## Stack");
     expect(summary).toContain("React");
+  });
+});
+
+describe("linkSkill", () => {
+  let tempDir: string;
+
+  afterEach(() => {
+    if (tempDir && existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("creates symlinks from agent skill paths to testme/skills", () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "testme-link-"));
+    const source = path.join(tempDir, "testme", "skills", "testme");
+    mkdirSync(source, { recursive: true });
+    writeFileSync(path.join(source, "SKILL.md"), "# testme", "utf8");
+
+    const created: string[] = [];
+    linkSkill("cursor", tempDir, created);
+
+    const target = path.join(tempDir, ".cursor", "skills", "testme");
+    expect(existsSync(target)).toBe(true);
+    expect(lstatSync(target).isSymbolicLink()).toBe(true);
+    expect(readFileSync(path.join(target, "SKILL.md"), "utf8")).toBe("# testme");
+  });
+});
+
+describe("migrateProject", () => {
+  let tempDir: string;
+
+  afterEach(() => {
+    if (tempDir && existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("moves legacy root files into testme/", () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), "testme-migrate-"));
+    mkdirSync(path.join(tempDir, ".git", "hooks"), { recursive: true });
+    writeFileSync(path.join(tempDir, "SUMMARY.md"), "# legacy summary", "utf8");
+    writeFileSync(path.join(tempDir, "PROMPTS.md"), "# legacy prompts", "utf8");
+    writeFileSync(path.join(tempDir, "testme.config.json"), '{"gateCommits":true}', "utf8");
+
+    const changes = migrateProject(tempDir);
+
+    expect(existsSync(path.join(tempDir, "testme", "SUMMARY.md"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "testme", "PROMPTS.md"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "testme", "config.json"))).toBe(true);
+    expect(existsSync(path.join(tempDir, "SUMMARY.md"))).toBe(false);
+    expect(changes.some((item) => item.includes("SUMMARY.md"))).toBe(true);
   });
 });

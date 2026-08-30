@@ -25,7 +25,7 @@ Toggle the comprehension gate that enforces `/testme` before commit and push.
 
 ## Status line
 
-For a persistent on/off indicator in Cursor, the user can wire `.testme/hooks/statusline.sh` into `~/.cursor/cli-config.json` (see README).
+For a persistent on/off indicator in Cursor, the user can wire `testme/hooks/statusline.sh` into `~/.cursor/cli-config.json` (see README).
 
 ## Notes
 

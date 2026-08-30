@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".testme/hooks/claude-pre-tool.sh",
+            "command": "testme/hooks/claude-pre-tool.sh",
             "timeout": 15
           }
         ]
