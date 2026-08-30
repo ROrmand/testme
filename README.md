@@ -219,21 +219,6 @@ npx comp-gate migrate                  # upgrade from root-level layout
 | Legacy paths | Run `npx comp-gate migrate` |
 | Uninstall | `npx comp-gate uninstall --yes` (add `--keep-data` to preserve `testme/`) |
 
-## Development
-
-```bash
-npm install
-npm run build
-npm test
-```
-
-Publish to npm:
-
-```bash
-npm login
-npm publish
-```
-
 ## Contributing
 
 Contributions are welcome. This is the comp-gate source repository — the npm package and CLI are both named `comp-gate`.
